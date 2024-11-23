@@ -1,7 +1,7 @@
 {
-  "name": "grouped-windows-vscode",
-  "displayName": "GroupedWindows",
-  "description": "GroupedWindows is a powerful and easy-to-use extension for VSCode that allows you to organize your workspace more efficiently by grouping multiple tabs within the same editor window.",
+  "name": "grouped-tabs-vscode",
+  "displayName": "GroupedTabs",
+  "description": "GroupedTabs is a powerful and easy-to-use extension for VSCode that allows you to organize your workspace more efficiently by grouping multiple tabs within the same editor window.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.95.0"
@@ -12,10 +12,12 @@
   "activationEvents": [],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "grouped-windows-vscode.helloWorld",
-      "title": "Hello World"
-    }]
+    "commands": [
+      {
+        "command": "extension.openGroupManager",
+        "title": "Open Tabs Groups Manager"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint .",

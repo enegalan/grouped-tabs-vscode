@@ -1,6 +1,6 @@
-# grouped-windows-vscode README
+# grouped-tabs-vscode README
 
-This is the README for your extension "grouped-windows-vscode". After writing up a brief description, we recommend including the following sections.
+This is the README for your extension "grouped-tabs-vscode". After writing up a brief description, we recommend including the following sections.
 
 ## Features
 
