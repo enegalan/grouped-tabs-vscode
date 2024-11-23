@@ -19,64 +19,68 @@ function activate(context) {
     // Create command
     const viewColumn = vscode.ViewColumn.Beside;
     const openGroupManagerCommand = vscode.commands.registerCommand(commandId, () => {
-        activePanel = vscode.window.createWebviewPanel(
-            panelId,
-            panelTitle,
-            viewColumn,
-            { enableScripts: true }
-        );
-        activePanel.webview.html = getWebviewContent();
-        activePanel.webview.onDidReceiveMessage(async (message) => {
-            console.debug('Message received from webview:', message);
-            switch (message.command) {
-                case 'createGroup': {
-                    vscode.window.showInputBox({ prompt: 'Enter new group name' })
-                    .then(groupName => {
-                        if (groupName) {
-                            createGroup(groupName);
+        if (activePanel) {
+            activePanel.reveal();
+        } else {
+            activePanel = vscode.window.createWebviewPanel(
+                panelId,
+                panelTitle,
+                viewColumn,
+                { enableScripts: true }
+            );
+            activePanel.webview.html = getWebviewContent();
+            activePanel.webview.onDidReceiveMessage(async (message) => {
+                console.debug('Message received from webview:', message);
+                switch (message.command) {
+                    case 'createGroup': {
+                        vscode.window.showInputBox({ prompt: 'Enter new group name' })
+                        .then(groupName => {
+                            if (groupName) {
+                                createGroup(groupName);
+                                updateWebviewContent();
+                            }
+                        });
+                        break;
+                    }
+                    case 'removeGroup': {
+                        const { group } = message;
+                        if (group) {
+                            console.debug('Removing group:', group);
+                            removeGroup(group);
                             updateWebviewContent();
+                        } else {
+                            vscode.window.showErrorMessage('Error: group not specified.');
                         }
-                    });
-                    break;
-                }
-                case 'removeGroup': {
-                    const { group } = message;
-                    if (group) {
-                        console.debug('Removing group:', group);
-                        removeGroup(group);
-                        updateWebviewContent();
-                    } else {
-                        vscode.window.showErrorMessage('Error: group not specified.');
+                        break;
                     }
-                    break;
-                }
-                case 'addFileToGroup': {
-                    const { group, file } = message;
-                    if (group && file) {
-                        console.debug('Adding file ' + file + ' to group ' + group)
-                        addToGroup(group, file);
-                        updateWebviewContent();
-                    } else {
-                        vscode.window.showErrorMessage('Error: group or file not specified.')
+                    case 'addFileToGroup': {
+                        const { group, file } = message;
+                        if (group && file) {
+                            console.debug('Adding file ' + file + ' to group ' + group)
+                            addToGroup(group, file);
+                            updateWebviewContent();
+                        } else {
+                            vscode.window.showErrorMessage('Error: group or file not specified.')
+                        }
+                        break;
                     }
-                    break;
-                }
-                case 'removeFileFromGroup': {
-                    const { group, file } = message;
-                    if (group && file) {
-                        console.debug('Removing file ' + file + ' from group ' + group);
-                        removeFromGroup(group, file);
-                        updateWebviewContent();
-                    } else {
-                        vscode.window.showErrorMessage('Error: group or file not specified.');
+                    case 'removeFileFromGroup': {
+                        const { group, file } = message;
+                        if (group && file) {
+                            console.debug('Removing file ' + file + ' from group ' + group);
+                            removeFromGroup(group, file);
+                            updateWebviewContent();
+                        } else {
+                            vscode.window.showErrorMessage('Error: group or file not specified.');
+                        }
+                        break;
                     }
-                    break;
+                    default:
+                        vscode.window.showErrorMessage('Unknown command.');
+                        break;
                 }
-                default:
-                    vscode.window.showErrorMessage('Unknown command.');
-                    break;
-            }
-        });
+            });
+        }
     });
     // Add command
     context.subscriptions.push(openGroupManagerCommand);
