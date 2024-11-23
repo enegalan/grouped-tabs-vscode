@@ -17,11 +17,12 @@ function activate(context) {
     statusBarButton.show();
     context.subscriptions.push(statusBarButton);
     // Create command
+    const viewColumn = vscode.ViewColumn.Beside;
     const openGroupManagerCommand = vscode.commands.registerCommand(commandId, () => {
         activePanel = vscode.window.createWebviewPanel(
             panelId,
             panelTitle,
-            vscode.ViewColumn.One,
+            viewColumn,
             { enableScripts: true }
         );
         activePanel.webview.html = getWebviewContent();
