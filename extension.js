@@ -2,6 +2,7 @@ const vscode = require('vscode');
 
 var groups = {};
 var activePanel;
+const commandId = 'extension.openGroupManager';
 const panelId = 'tabGroupManager';
 const panelTitle = 'Tabs Groups Manager';
 /**
@@ -9,7 +10,14 @@ const panelTitle = 'Tabs Groups Manager';
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-    const openGroupManagerCommand = vscode.commands.registerCommand('extension.openGroupManager', () => {
+    // Create a status bar item (button)
+    const statusBarButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    statusBarButton.text = '$(layers) Open Tabs Groups Manager';
+    statusBarButton.command = commandId;
+    statusBarButton.show();
+    context.subscriptions.push(statusBarButton);
+    // Create command
+    const openGroupManagerCommand = vscode.commands.registerCommand(commandId, () => {
         activePanel = vscode.window.createWebviewPanel(
             panelId,
             panelTitle,
