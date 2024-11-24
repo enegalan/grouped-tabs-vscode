@@ -55,10 +55,10 @@ function activate(context) {
                         break;
                     }
                     case 'addFileToGroup': {
-                        const { group, file } = message;
+                        const { group, file, path } = message;
                         if (group && file) {
                             console.debug('Adding file ' + file + ' to group ' + group)
-                            addToGroup(group, file);
+                            addToGroup(group, file, path);
                             updateWebviewContent();
                         } else {
                             vscode.window.showErrorMessage('Error: group or file not specified.')
@@ -89,14 +89,14 @@ function activate(context) {
         const fileName = uri.fsPath.split('/').pop();
         const existingGroup = findGroupForFile(fileName);
         if (existingGroup) {
-            addToGroup(existingGroup, fileName);
-            openFile(uri);
+            addToGroup(existingGroup, fileName, uri.fsPath);
+            openFile(uri.fsPath);
         } else {
             vscode.window.showInputBox({ prompt: 'Enter new group name' }).then(groupName => {
                 if (groupName) {
                     createGroup(groupName);
-                    addToGroup(groupName, fileName);
-                    openFile(uri);
+                    addToGroup(groupName, fileName, uri.fsPath);
+                    openFile(uri.fsPath);
                 }
             });
         }
@@ -124,10 +124,11 @@ function activate(context) {
 }
 
 /**
- * Open file on editor
- * @param {vscode.Uri} uri File URI.
+ * Open file on editor.
+ * @param {string} path File path.
  */
-function openFile(uri) {
+function openFile(path) {
+    const uri = vscode.Uri.file(path);
     vscode.workspace.openTextDocument(uri).then(doc => {
         vscode.window.showTextDocument(doc);
     });
@@ -140,9 +141,11 @@ function openFile(uri) {
  */
 function findGroupForFile(fileName) {
     for (const [groupName, group] of Object.entries(groups)) {
-        if (group.files.includes(fileName)) {
-            return groupName;
-        }
+        group.files.forEach(file => () => {
+            if (file.name == fileName) {
+                return groupName;
+            }
+        });
     }
     return null;
 }
@@ -174,11 +177,15 @@ function removeGroup(groupName) {
  * Add file to a group.
  * @param {string} groupName Group name.
  * @param {string} fileName File name.
+ * @param {string} path File absolute path.
  */
-function addToGroup(groupName, fileName) {
+function addToGroup(groupName, fileName, path) {
     if (groups[groupName]) {
         if (!groups[groupName].files.includes(fileName)) {
-            groups[groupName].files.push(fileName);
+            groups[groupName].files.push({
+                name: fileName,
+                path: path,
+            });
             vscode.window.showInformationMessage(`File added to group ${groupName}.`);
         } else {
             vscode.window.showWarningMessage(`File is already in this group.`);
@@ -195,8 +202,8 @@ function addToGroup(groupName, fileName) {
  */
 function removeFromGroup(groupName, fileName) {
     if (groups[groupName]) {
-        const fileIndex = groups[groupName].files.indexOf(fileName);
-        if (fileIndex > -1) {
+        const fileIndex = groups[groupName].files.findIndex(file => file.name === fileName);
+        if (fileIndex !== -1) {
             groups[groupName].files.splice(fileIndex, 1);
             vscode.window.showInformationMessage(`File ${fileName} removed from group '${groupName}'.`);
         } else {
@@ -226,16 +233,15 @@ function getWebviewContent() {
         .flatMap(group => group.tabs)
         .filter(tab => tab.input && tab.input.uri) // Exclude tabs without file
         .filter(tab => tab.label !== panelTitle) // Exclude the tabs groups manager itself
-        .map(tab => tab.label);
-    const groupedFiles = Object.values(groups).flatMap(group => group.files);
-    const openFiles = allOpenFiles.filter(file => !groupedFiles.includes(file)); // Exclude those that are already grouped
+    const groupedFiles = Object.values(groups).flatMap(group => group.files.map(file => file.path));
+    const openFiles = allOpenFiles.filter(file => !groupedFiles.includes(file.input.uri.fsPath)); // Exclude those that are already grouped
     const groupsHtml = Object.entries(groups)
         .map(([groupName, group]) => {
             const filesHtml = group.files
                 .map(file => `
                     <li>
-                        ${file} 
-                        <button onclick="removeFile('${groupName}', '${file}')">Remove</button>
+                        ${file.name} 
+                        <button onclick="removeFile('${groupName}', '${file.name}')">Remove</button>
                     </li>
                 `)
                 .join('');
@@ -252,7 +258,7 @@ function getWebviewContent() {
     var filesHtml = '';
     if (openFiles.length > 0) {
         filesHtml = openFiles.map(file => `
-            <div class="file" draggable="true" ondragstart="drag(event, '${file}')">${file}</div>
+            <div class="file" draggable="true" ondragstart="drag(event, '${file.label}', '${file.input.uri.fsPath}')">${file.label}</div>
         `).join('');
     }
     return `
@@ -316,14 +322,21 @@ function getWebviewContent() {
             <script>
                 const vscode = acquireVsCodeApi();
                 function allowDrop(event) { event.preventDefault(); }
-                function drag(event, fileName) { event.dataTransfer.setData("text/plain", fileName); }
-                function drop(event, groupName) {
+                function drag(event, fileName, path) {
+                    var data = {};
+                    data.fileName = fileName;
+                    data.path = path;
+                    event.dataTransfer.setData("text/plain", JSON.stringify(data));
+                }
+                function drop(event, groupName, path) {
                     event.preventDefault();
-                    const fileName = event.dataTransfer.getData("text/plain");
+                    var data = event.dataTransfer.getData("text/plain");
+                    data = JSON.parse(data);
                     vscode.postMessage({
                         command: 'addFileToGroup',
                         group: groupName,
-                        file: fileName
+                        file: data.fileName,
+                        path: data.path,
                     });
                 }
                 function removeFile(groupName, fileName) {
