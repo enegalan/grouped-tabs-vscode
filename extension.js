@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 
 var groups = {};
+var subscriptions = [];
 var activePanel;
 const commandId = 'extension.openGroupManager';
 const panelId = 'tabGroupManager';
@@ -15,7 +16,7 @@ function activate(context) {
     statusBarButton.text = '$(layers) Open Tabs Groups Manager';
     statusBarButton.command = commandId;
     statusBarButton.show();
-    context.subscriptions.push(statusBarButton);
+    subscriptions.push(statusBarButton);
     // Create command
     const viewColumn = vscode.ViewColumn.Beside;
     const openGroupManagerCommand = vscode.commands.registerCommand(commandId, () => {
@@ -82,8 +83,25 @@ function activate(context) {
             });
         }
     });
-    // Add command
-    context.subscriptions.push(openGroupManagerCommand);
+    subscriptions.push(openGroupManagerCommand);
+    // Right-click context menu command for files in explorer
+    const fileContextMenuCommand = vscode.commands.registerCommand('extension.addFileToGroupFromExplorer', (uri) => {
+        const fileName = uri.fsPath.split('/').pop();
+        const existingGroup = findGroupForFile(fileName);
+        if (existingGroup) {
+            addToGroup(existingGroup, fileName);
+            openFile(uri);
+        } else {
+            vscode.window.showInputBox({ prompt: 'Enter new group name' }).then(groupName => {
+                if (groupName) {
+                    createGroup(groupName);
+                    addToGroup(groupName, fileName);
+                    openFile(uri);
+                }
+            });
+        }
+    });
+    subscriptions.push(fileContextMenuCommand);
 
     // Visible editors changes listener
     vscode.window.onDidChangeVisibleTextEditors(() => {
@@ -100,7 +118,33 @@ function activate(context) {
     // Window state changes listener
     vscode.window.onDidChangeWindowState(() => {
         updateWebviewContent();
-    })
+    });
+    // Add subscriptions / commands
+    subscriptions.forEach(subscription => context.subscriptions.push(subscription));
+}
+
+/**
+ * Open file on editor
+ * @param {vscode.Uri} uri File URI.
+ */
+function openFile(uri) {
+    vscode.workspace.openTextDocument(uri).then(doc => {
+        vscode.window.showTextDocument(doc);
+    });
+}
+
+/**
+ * Finds file if exists on any group.
+ * @param {string} fileName File name.
+ * @returns {string|null} Group name if exists, or null if not.
+ */
+function findGroupForFile(fileName) {
+    for (const [groupName, group] of Object.entries(groups)) {
+        if (group.files.includes(fileName)) {
+            return groupName;
+        }
+    }
+    return null;
 }
 
 /**

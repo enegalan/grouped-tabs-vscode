@@ -18,8 +18,22 @@
       {
         "command": "extension.openGroupManager",
         "title": "Open Tabs Groups Manager"
+      },
+      {
+        "command": "extension.addFileToGroupFromExplorer",
+        "title": "Open on Group from Explorer",
+        "category": "File"
       }
-    ]
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "extension.addFileToGroupFromExplorer",
+          "when": "resourceLangId != 'folder'", 
+          "group": "1_main"
+        }
+      ]
+    }
   },
   "scripts": {
     "lint": "eslint .",
