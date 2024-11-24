@@ -221,7 +221,7 @@ function getRandomColor() {
  * @returns {string} HTML string.
  */
 function getWebviewContent() {
-	console.debug('Generating Webview Content.');
+	console.debug('Generating Webview Content.', vscode.window.tabGroups.all);
     const allOpenFiles = vscode.window.tabGroups.all
         .flatMap(group => group.tabs)
         .filter(tab => tab.input && tab.input.uri) // Exclude tabs without file
