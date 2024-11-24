@@ -149,7 +149,7 @@ function activate(context) {
             }
         }
     });
-    context.subscriptions.push(fileContextMenuCommand);
+    subscriptions.push(fileContextMenuCommand);
 
     // Visible editors changes listener
     vscode.window.onDidChangeVisibleTextEditors(() => {
