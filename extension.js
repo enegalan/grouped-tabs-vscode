@@ -93,6 +93,11 @@ function activate(context) {
                         }
                         break;
                     }
+                    case 'showFileFromGroup': {
+                        const { group, filePath } = message;
+                        openFile(filePath);
+                        break;
+                    }
                     default:
                         vscode.window.showErrorMessage('Unknown command.');
                         break;
@@ -166,7 +171,6 @@ function activate(context) {
  * @param {string} path File path.
  */
 async function openFile(path) {
-    if (isFileOpened(path)) return;
     const uri = vscode.Uri.file(path);
     vscode.workspace.openTextDocument(uri).then(async doc => {
         await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, preview: false });
@@ -355,6 +359,7 @@ function getWebviewContent() {
                     <li>
                         ${file.name} 
                         <button onclick="removeFile('${groupName}', '${file.name}')">Remove</button>
+                        <button onclick="showFile('${groupName}', '${file.path}')">Show</button>
                     </li>
                 `)
                 .join('');
@@ -456,6 +461,9 @@ function getWebviewContent() {
                 }
                 function removeFile(groupName, fileName) {
                     vscode.postMessage({ command: 'removeFileFromGroup', group: groupName, file: fileName });
+                }
+                function showFile(groupName, filePath) {
+                    vscode.postMessage({ command: 'showFileFromGroup', group: groupName, filePath: filePath });
                 }
                 function removeGroup(groupName) {
                     vscode.postMessage({ command: 'removeGroup', group: groupName });
