@@ -98,6 +98,11 @@ function activate(context) {
                         openFile(filePath);
                         break;
                     }
+                    case 'hideFileFromGroup': {
+                        const { group, filePath } = message;
+                        closeFile(filePath);
+                        break;
+                    }
                     default:
                         vscode.window.showErrorMessage('Unknown command.');
                         break;
@@ -360,6 +365,7 @@ function getWebviewContent() {
                         ${file.name} 
                         <button onclick="removeFile('${groupName}', '${file.name}')">Remove</button>
                         <button onclick="showFile('${groupName}', '${file.path}')">Show</button>
+                        <button onclick="hideFile('${groupName}', '${file.path}')">Hide</button>
                     </li>
                 `)
                 .join('');
@@ -464,6 +470,9 @@ function getWebviewContent() {
                 }
                 function showFile(groupName, filePath) {
                     vscode.postMessage({ command: 'showFileFromGroup', group: groupName, filePath: filePath });
+                }
+                function hideFile(groupName, filePath) {
+                    vscode.postMessage({ command: 'hideFileFromGroup', group: groupName, filePath: filePath });
                 }
                 function removeGroup(groupName) {
                     vscode.postMessage({ command: 'removeGroup', group: groupName });
