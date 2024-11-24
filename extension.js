@@ -53,6 +53,26 @@ function activate(context) {
                         }
                         break;
                     }
+                    case 'showGroupTabs': {
+                        const { group } = message;
+                        if (group) {
+                            console.debug('Showing all tabs of group:', group);
+                            await showGroupTabs(group);
+                        } else {
+                            vscode.window.showErrorMessage('Error: group not specified.');
+                        }
+                        break;
+                    }
+                    case 'hideGroupTabs': {
+                        const { group } = message;
+                        if (group) {
+                            console.debug('Hiding all tabs of group:', group);
+                            await hideGroupTabs(group);
+                        } else {
+                            vscode.window.showErrorMessage('Error: group not specified.');
+                        }
+                        break;
+                    }
                     case 'addFileToGroup': {
                         const { group, file, path } = message;
                         if (group && file) {
@@ -145,12 +165,26 @@ function activate(context) {
  * Open file on editor.
  * @param {string} path File path.
  */
-function openFile(path) {
+async function openFile(path) {
     if (isFileOpened(path)) return;
     const uri = vscode.Uri.file(path);
-    vscode.workspace.openTextDocument(uri).then(doc => {
-        vscode.window.showTextDocument(doc);
+    vscode.workspace.openTextDocument(uri).then(async doc => {
+        await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, preview: false });
     });
+}
+
+/**
+ * Close file on editor.
+ * @param {string} path File path.
+ */
+async function closeFile(path) {
+    const openFiles = getOpenFiles(false);
+    const targetFile = openFiles.find(file => file.input.uri.fsPath === path);
+    try {
+        await vscode.window.tabGroups.close(targetFile);
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error closing file ${path}: ${error.message}`);
+    }
 }
 
 /**
@@ -188,6 +222,41 @@ function removeGroup(groupName) {
         delete groups[groupName];
         updateWebviewContent();
         vscode.window.showInformationMessage(`Group ${groupName} removed successfully.`);
+    } else {
+        vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
+    }
+}
+
+
+/**
+ * Show all tabs of a group.
+ * @param {string} groupName Group name.
+ */
+async function showGroupTabs(groupName) {
+    if (groups[groupName]) {
+        for (const file of groups[groupName].files) {
+            console.log('showing tab:', file);
+            await openFile(file.path); // Asegura que se abra cada archivo antes de continuar
+        }
+        updateWebviewContent();
+        vscode.window.showInformationMessage(`Group ${groupName} tabs displayed successfully.`);
+    } else {
+        vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
+    }
+}
+
+/**
+ * Hide all tabs of a group.
+ * @param {string} groupName Group name.
+ */
+async function hideGroupTabs(groupName) {
+    if (groups[groupName]) {
+        for (const file of groups[groupName].files) {
+            console.log('hiding tab:', file);
+            await closeFile(file.path);
+        }
+        updateWebviewContent();
+        vscode.window.showInformationMessage(`Group ${groupName} tabs hidden successfully.`);
     } else {
         vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
     }
@@ -295,6 +364,8 @@ function getWebviewContent() {
                     <h3 style="color: #e8e8e8;">${groupName} (${group.files.length})</h3>
                     <ul>${filesHtml}</ul>
                     <button onclick="removeGroup('${groupName}')">Delete Group</button>
+                    <button onclick="showGroupTabs('${groupName}')">Show All</button>
+                    <button onclick="hideGroupTabs('${groupName}')">Hide All</button>
                 </div>`;
         })
         .join('');
@@ -388,6 +459,12 @@ function getWebviewContent() {
                 }
                 function removeGroup(groupName) {
                     vscode.postMessage({ command: 'removeGroup', group: groupName });
+                }
+                function showGroupTabs(groupName) {
+                    vscode.postMessage({ command: 'showGroupTabs', group: groupName });
+                }
+                function hideGroupTabs(groupName) {
+                    vscode.postMessage({ command: 'hideGroupTabs', group: groupName });
                 }
             </script>
         </body>
