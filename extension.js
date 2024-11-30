@@ -251,7 +251,6 @@ function removeGroup(groupName) {
     }
 }
 
-
 /**
  * Show all tabs of a group.
  * @param {string} groupName Group name.
@@ -259,7 +258,6 @@ function removeGroup(groupName) {
 async function showGroupTabs(groupName) {
     if (groups[groupName]) {
         for (const file of groups[groupName].files) {
-            console.log('showing tab:', file);
             await openFile(file.path); // Asegura que se abra cada archivo antes de continuar
         }
         updateWebviewContent();
@@ -276,7 +274,6 @@ async function showGroupTabs(groupName) {
 async function hideGroupTabs(groupName) {
     if (groups[groupName]) {
         for (const file of groups[groupName].files) {
-            console.log('hiding tab:', file);
             await closeFile(file.path);
         }
         updateWebviewContent();
@@ -344,7 +341,6 @@ function getRandomColor() {
  * @returns {vscode.Tab[]} Tabs array.
  */
 function getOpenFiles(exclude_grouped = true) {
-    console.log('vscode.window.tabGroups.all', vscode.window.tabGroups.all);
     const allOpenFiles = vscode.window.tabGroups.all
         .flatMap(group => group.tabs)
         .filter(tab => tab.input && tab.input.uri) // Exclude tabs without file
@@ -554,20 +550,7 @@ function writeOnVsCode(scriptContent, styleContent) {
             script.remove();
         }
         // Load script
-        const observerScript = `
-            const observer = new MutationObserver(() => {
-                const tabs = document.querySelectorAll('.monaco-editor-pane .tab');
-                tabs.forEach(tab => {
-                    const tabLabel = tab.textContent.trim();
-                    const groupName = findGroupForFile(tabLabel);
-                    if (groupName) {
-                        tab.classList.add('tab-' + groupName);
-                    }
-                });
-            });
-            observer.observe(document.body, { childList: true, subtree: true });
-        `;
-        scriptContent = observerScript + `
+        scriptContent = `
             // Clear old style
             if (document.getElementById('${styleId}')) {
                 document.getElementById('${styleId}').remove();
