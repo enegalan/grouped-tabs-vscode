@@ -1,4 +1,7 @@
 const vscode = require('vscode');
+const fs = require("fs");
+const cheerio = require('cheerio');
+const path = require("path");
 
 var groups = {};
 var subscriptions = [];
@@ -6,11 +9,23 @@ var activePanel;
 const commandId = 'extension.openGroupManager';
 const panelId = 'tabGroupManager';
 const panelTitle = 'Tabs Groups Manager';
+const styleId = 'grouped-tabs-style';
+var styleContent = `
+    
+`;
+var style = null;
+const scriptId = 'grouped-tabs-script';
+var scriptContent = `
+
+`;
+var script = null;
+var htmlPath = null;
 /**
  * Activate extension.
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+    writeOnVsCode(scriptContent, styleContent);
     // Create a status bar item (button)
     const statusBarButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     statusBarButton.text = '$(layers) Open Tabs Groups Manager';
@@ -493,7 +508,86 @@ function getWebviewContent() {
  * Update Webview Content UI.
  */
 function updateWebviewContent() {
-    if (activePanel) activePanel.webview.html = getWebviewContent();
+    if (activePanel) {
+        const dynamicStyleContent = Object.entries(groups)
+        .map(([groupName, group]) => `
+            .tab-${groupName} {
+                    border-top: 3px solid ${group.color};
+            }
+        `).join('');
+        const updatedStyleContent = `
+            ${dynamicStyleContent}
+        `;
+        styleContent = updatedStyleContent;
+        if (style) {
+            style.html(updatedStyleContent);
+        } else {
+            writeOnVsCode(scriptContent, updatedStyleContent);
+        }
+        activePanel.webview.html = getWebviewContent();
+    }
+}
+
+function writeOnVsCode(scriptContent, styleContent) {
+    const appDir = require.main
+		? path.dirname(require.main.filename)
+		: globalThis._VSCODE_FILE_ROOT;
+	const base = path.join(appDir, "vs", "code");
+	htmlPath = path.join(base, "electron-sandbox", "workbench", "workbench.html");
+	if (!fs.existsSync(htmlPath)) {
+		htmlPath = path.join(base, "electron-sandbox", "workbench", "workbench.esm.html");
+	}
+	if (!fs.existsSync(htmlPath)) {
+		vscode.window.showInformationMessage('VSCode path not found!');
+	}
+    fs.readFile(htmlPath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error while reading VSCode layout', err);
+            return;
+        }
+        const $ = cheerio.load(data);
+        $('meta[http-equiv="Content-Security-Policy"]').remove();
+        script = $('#'+scriptId);
+        // Clean old script
+        let scriptExists = script.length;
+        if (scriptExists) {
+            script.remove();
+        }
+        // Load script
+        const observerScript = `
+            const observer = new MutationObserver(() => {
+                const tabs = document.querySelectorAll('.monaco-editor-pane .tab');
+                tabs.forEach(tab => {
+                    const tabLabel = tab.textContent.trim();
+                    const groupName = findGroupForFile(tabLabel);
+                    if (groupName) {
+                        tab.classList.add('tab-' + groupName);
+                    }
+                });
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        `;
+        scriptContent = observerScript + `
+            // Clear old style
+            if (document.getElementById('${styleId}')) {
+                document.getElementById('${styleId}').remove();
+            }
+            // Load style
+            const styleElement = document.createElement('style');
+            styleElement.id = '${styleId}';
+            styleElement.textContent = \`${styleContent}\`;
+            document.head.append(styleElement);
+        ` + scriptContent;
+        $('html').append('<script id="' + scriptId + '">'+scriptContent+'</script>');
+        // Set new layout
+        fs.writeFile(htmlPath, $.html(), (err) => {
+            if (err) {
+                console.error('Error saving VSCode file', err);
+            } else {
+                console.log('VSCode File Correctly Saved')
+            }
+        });
+    })
 }
 
 /**
