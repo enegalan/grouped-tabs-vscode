@@ -3,7 +3,7 @@ const fs = require("fs");
 const cheerio = require('cheerio');
 const path = require("path");
 
-const debug = true; // Variable de depuración
+const debug = true;
 
 const tabBgLeftSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-left.svg'), 'utf8');
 const tabBgRightSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-right.svg'), 'utf8');
