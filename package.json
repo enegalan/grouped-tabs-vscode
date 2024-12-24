@@ -17,13 +17,29 @@
   "contributes": {
     "commands": [
       {
-        "command": "extension.openGroupManager",
-        "title": "Open Tabs Groups Manager"
-      },
-      {
         "command": "extension.addFileToGroupFromExplorer",
         "title": "Open on Group from Explorer",
         "category": "File"
+      },
+      {
+        "command": "extension.addFileToNewGroupFromTab",
+        "title": "Add Tab to a new group"
+      },
+      {
+        "command": "extension.addFileToGroupFromTab",
+        "title": "Add Tab to Group"
+      },
+      {
+        "command": "extension.addTabToGroup",
+        "title": "Add Tab to Group"
+      },
+      {
+        "command": "extension.createGroup",
+        "title": "New group"
+      },
+      {
+        "command": "extension.deleteGroup",
+        "title": "Remove group"
       }
     ],
     "menus": {
@@ -34,14 +50,40 @@
           "group": "1_main"
         }
       ],
-      "editor/title": [
+      "editor/title/context": [
         {
-          "command": "extension.addFileToGroupFromExplorer",
-          "when": "resourceScheme == 'file'",
+          "submenu": "groups.submenu",
+          "when": "hasGroups == true && resourcePath in grouped.files.names",
+          "group": "navigation"
+        },
+        {
+          "command": "extension.addFileToNewGroupFromTab",
+          "when": "hasGroups == false",
+          "group": "navigation"
+        },
+        {
+          "command": "extension.addFileToGroupFromTab",
+          "when": "hasGroups == true && resourcePath not in grouped.files.names",
+          "group": "navigation"
+        }
+      ],
+      "groups.submenu": [
+        {
+          "command": "extension.createGroup",
+          "group": "navigation"
+        },
+        {
+          "command": "extension.deleteGroup",
           "group": "navigation"
         }
       ]
-    }
+    },
+    "submenus": [
+      {
+        "id": "groups.submenu",
+        "label": "Manage tab groups"
+      }
+    ]
   },
   "scripts": {
     "lint": "eslint .",

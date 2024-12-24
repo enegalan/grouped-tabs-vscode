@@ -10,12 +10,12 @@ const tabBgRightSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-right.
 
 var groups = {};
 var subscriptions = [];
-var activePanel;
-const commandId = 'extension.openGroupManager';
-const panelId = 'tabGroupManager';
-const panelTitle = 'Tabs Groups Manager';
 const styleId = 'grouped-tabs-style';
 var styleContent = `
+/* Tab actions (close button) */
+.tab-actions {
+    z-index: 5;
+}
 /* Disable VSCode native tab drag-and-drop indicator */
 .monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab.drop-target-left:after,
 .monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab.drop-target-right:before {
@@ -70,7 +70,6 @@ var styleContent = `
     color: var(--tab-border-hover-color) !important;
 }
 `;
-var style = null;
 const scriptId = 'grouped-tabs-script';
 var scriptContent = `
     (function() {
@@ -123,164 +122,124 @@ function activate(context) {
     const config = vscode.workspace.getConfiguration();
     config.update('vscode_custom_css.enabled', true, vscode.ConfigurationTarget.Global);
     writeOnVsCode(scriptContent, styleContent);
-    // Create a status bar item (button)
-    const statusBarButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    statusBarButton.text = '$(layers) Open Tabs Groups Manager';
-    statusBarButton.command = commandId;
-    statusBarButton.show();
-    subscriptions.push(statusBarButton);
-    // Create command
-    const viewColumn = vscode.ViewColumn.Beside;
-    const openGroupManagerCommand = vscode.commands.registerCommand(commandId, () => {
-        if (activePanel) {
-            activePanel.reveal();
-        } else {
-            activePanel = vscode.window.createWebviewPanel(
-                panelId,
-                panelTitle,
-                viewColumn,
-                { enableScripts: true }
-            );
-            activePanel.webview.html = getWebviewContent();
-            activePanel.webview.onDidReceiveMessage(async (message) => {
-                if (debug) console.log('Message received from webview:', message);
-                switch (message.command) {
-                    case 'createGroup': {
-                        vscode.window.showInputBox({ prompt: 'Enter new group name' })
-                        .then(groupName => {
-                            if (groupName) {
-                                createGroup(groupName);
-                                updateWebviewContent();
-                            }
-                        });
-                        break;
-                    }
-                    case 'removeGroup': {
-                        const { group } = message;
-                        if (group) {
-                            if (debug) console.log('Removing group:', group);
-                            removeGroup(group);
-                        } else {
-                            vscode.window.showErrorMessage('Error: group not specified.');
-                        }
-                        break;
-                    }
-                    case 'showGroupTabs': {
-                        const { group } = message;
-                        if (group) {
-                            if (debug) console.log('Showing all tabs of group:', group);
-                            await showGroupTabs(group);
-                        } else {
-                            vscode.window.showErrorMessage('Error: group not specified.');
-                        }
-                        break;
-                    }
-                    case 'hideGroupTabs': {
-                        const { group } = message;
-                        if (group) {
-                            if (debug) console.log('Hiding all tabs of group:', group);
-                            await hideGroupTabs(group);
-                        } else {
-                            vscode.window.showErrorMessage('Error: group not specified.');
-                        }
-                        break;
-                    }
-                    case 'addFileToGroup': {
-                        const { group, file, path } = message;
-                        if (group && file) {
-                            if (debug) console.log('Adding file ' + file + ' to group ' + group);
-                            addToGroup(group, file, path);
-                        } else {
-                            vscode.window.showErrorMessage('Error: group or file not specified.');
-                        }
-                        break;
-                    }
-                    case 'removeFileFromGroup': {
-                        const { group, file } = message;
-                        if (group && file) {
-                            if (debug) console.log('Removing file ' + file + ' from group ' + group);
-                            removeFromGroup(group, file);
-                        } else {
-                            vscode.window.showErrorMessage('Error: group or file not specified.');
-                        }
-                        break;
-                    }
-                    case 'showFileFromGroup': {
-                        const { group, filePath } = message;
-                        openFile(filePath);
-                        break;
-                    }
-                    case 'hideFileFromGroup': {
-                        const { group, filePath } = message;
-                        closeFile(filePath);
-                        break;
-                    }
-                    default:
-                        vscode.window.showErrorMessage('Unknown command.');
-                        break;
-                }
-            });
-        }
-    });
-    subscriptions.push(openGroupManagerCommand);
-    // Right-click context menu command for files in explorer
+    // * Right-click context menu command for files in explorer
     const fileContextMenuCommand = vscode.commands.registerCommand('extension.addFileToGroupFromExplorer', async (uri) => {
-        if (!uri) {
-            vscode.window.showErrorMessage('No file selected.');
-            return;
-        }
+        if (!uri) return;
         const fileName = uri.fsPath.split('/').pop();
         const existingGroup = findGroupForFile(fileName);
         if (existingGroup) {
             openFile(uri.fsPath);
-            vscode.window.showInformationMessage('File is already in group.');
         } else {
-            const groupNames = Object.keys(groups);
-            if (groupNames.length > 0) {
-                const selectedGroup = await vscode.window.showQuickPick([...groupNames, 'Create New Group'], {
-                    placeHolder: 'Select a group or create a new one',
-                });
-                if (selectedGroup === 'Create New Group') {
-                    const groupName = await vscode.window.showInputBox({ prompt: 'Enter new group name' });
-                    if (groupName) {
-                        createGroup(groupName);
-                        addToGroup(groupName, fileName, uri.fsPath);
-                        openFile(uri.fsPath);
-                    }
-                } else if (selectedGroup) {
-                    addToGroup(selectedGroup, fileName, uri.fsPath);
-                    openFile(uri.fsPath);
-                }
-            } else {
-                const groupName = await vscode.window.showInputBox({ prompt: 'Enter new group name' });
-                if (groupName) {
-                    createGroup(groupName);
-                    addToGroup(groupName, fileName, uri.fsPath);
-                    openFile(uri.fsPath);
-                }
-            }
+            tabRightClickProcedure(fileName, uri);
         }
     });
     subscriptions.push(fileContextMenuCommand);
 
+    // * Tab right-click context menu command
+    const tabContextMenuCommand = vscode.commands.registerCommand('extension.addFileToNewGroupFromTab', async () => {
+        const activeEditor = vscode.window.activeTextEditor;
+        if (!activeEditor) return;
+        const uri = activeEditor.document.uri;
+        const fileName = uri.fsPath.split('/').pop();
+        tabRightClickProcedure(fileName, uri);
+    });
+    subscriptions.push(tabContextMenuCommand);
+
+    // Hack to set different titles to menu context labels (for the same command)
+    vscode.commands.registerCommand('extension.addFileToGroupFromTab', async () => {
+        vscode.commands.executeCommand('extension.addFileToNewGroupFromTab');
+    });
+
+    // Add context menu for adding tab to another group
+    vscode.commands.registerCommand('extension.addTabToGroup', async () => {
+        vscode.commands.executeCommand('extension.addFileToNewGroupFromTab');
+    });
+
+    // * Tab Submenu commands
+    // Command to create a group from tab submenu
+    const createGroupCommand = vscode.commands.registerCommand('extension.createGroup', async () => {
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor) {
+            const uri = activeEditor.document.uri;
+            const fileName = uri.fsPath.split('/').pop();
+            createGroupProcedure(fileName, uri.fsPath);
+        }
+    });
+    subscriptions.push(createGroupCommand);
+
+    // Command to delete a group from tab submenu
+    const deleteGroupCommand = vscode.commands.registerCommand('extension.deleteGroup', async (uri) => {
+        // Get groups that contains the file
+        const deletableGroups = getDeletableGroupNames(uri.fsPath);
+        if (debug) console.log('Deleting group', uri, groups, deletableGroups);
+        const selectedGroup = await vscode.window.showQuickPick(deletableGroups, {
+            placeHolder: 'Select a group to delete',
+        });
+        if (selectedGroup) removeGroup(selectedGroup);
+    });
+    subscriptions.push(deleteGroupCommand);
+
     // Visible editors changes listener
     vscode.window.onDidChangeVisibleTextEditors(() => {
-        updateWebviewContent();
+        updateContext();
     });
     // Active editor changes listener
     vscode.window.onDidChangeActiveTextEditor(() => {
-        updateWebviewContent();
+        updateContext();
     });
     // Editor closes listener
     vscode.workspace.onDidCloseTextDocument(() => {
-        updateWebviewContent();
+        updateContext();
     });
     // Window state changes listener
     vscode.window.onDidChangeWindowState(() => {
-        updateWebviewContent();
+        updateContext();
     });
+    updateContext();
     // Add subscriptions / commands
     subscriptions.forEach(subscription => context.subscriptions.push(subscription));
+}
+
+/**
+ * Procedure for tab right-click context menu.
+ */
+async function tabRightClickProcedure(fileName, uri) {
+    const groupNames = Object.keys(groups);
+    if (groupNames.length > 0) {
+        const selectedGroup = await vscode.window.showQuickPick([...groupNames, 'Create New Group'], {
+            placeHolder: 'Select a group or create a new one',
+        });
+        if (selectedGroup === 'Create New Group') {
+            createGroupProcedure(fileName, uri.fsPath);
+        } else if (selectedGroup) {
+            addToGroup(selectedGroup, fileName, uri.fsPath);
+        }
+    } else {
+        createGroupProcedure(fileName, uri.fsPath);
+    }
+    updateContext();
+}
+
+/**
+ * Procedure for creating groups.
+ */
+async function createGroupProcedure(fileName, path) {
+    const groupName = await vscode.window.showInputBox({ prompt: 'Enter new group name' });
+    if (groupName) {
+        createGroup(groupName);
+        addToGroup(groupName, fileName, path);
+    }
+}
+
+/**
+ * Updates the context of the extension.
+ */
+function updateContext() {
+    const groupNames = Object.keys(groups);
+    vscode.commands.executeCommand('setContext', 'hasGroups', groupNames.length > 0);
+    // Get grouped files names
+    const groupedFiles = getGroupedFilePaths();
+    vscode.commands.executeCommand('setContext', 'grouped.files.names', groupedFiles);
 }
 
 /**
@@ -293,6 +252,26 @@ async function openFile(path) {
     vscode.workspace.openTextDocument(uri).then(async doc => {
         await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, preview: false });
     });
+}
+
+/**
+ * Get deletable group names.
+ * @param {string} uriPath File path.
+ * @returns {string[]} Group names.
+ */
+function getDeletableGroupNames(uriPath) {
+    return Object.entries(groups)
+        .filter(([groupName, group]) => group.files.some(file => file.path === uriPath))
+        .map(([groupName, group]) => groupName);
+}
+
+/**
+ * Get grouped filenames.
+ * @returns {string[]} Group names.
+ */
+function getGroupedFilePaths() {
+    return Object.values(groups)
+        .flatMap(group => group.files.map(file => file.path));
 }
 
 /**
@@ -335,6 +314,7 @@ function createGroup(name) {
     const color = getRandomColor();
     groups[name] = { color, files: [] };
     vscode.window.showInformationMessage(`Group ${name} created successfully.`);
+    updateContext();
 }
 
 /**
@@ -345,8 +325,8 @@ function removeGroup(groupName) {
     if (debug) console.log('Removing group:', groupName);
     if (groups[groupName]) {
         delete groups[groupName];
-        updateWebviewContent();
         vscode.window.showInformationMessage(`Group ${groupName} removed successfully.`);
+        updateContext();
     } else {
         vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
     }
@@ -360,9 +340,8 @@ async function showGroupTabs(groupName) {
     if (debug) console.log('Showing tabs for group:', groupName);
     if (groups[groupName]) {
         for (const file of groups[groupName].files) {
-            await openFile(file.path); // Asegura que se abra cada archivo antes de continuar
+            await openFile(file.path); // Ensure file is opened until continue
         }
-        updateWebviewContent();
         vscode.window.showInformationMessage(`Group ${groupName} tabs displayed successfully.`);
     } else {
         vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
@@ -377,9 +356,8 @@ async function hideGroupTabs(groupName) {
     if (debug) console.log('Hiding tabs for group:', groupName);
     if (groups[groupName]) {
         for (const file of groups[groupName].files) {
-            await closeFile(file.path);
+            await closeFile(file.path); // Ensure file is closed until continue
         }
-        updateWebviewContent();
         vscode.window.showInformationMessage(`Group ${groupName} tabs hidden successfully.`);
     } else {
         vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
@@ -397,11 +375,13 @@ function addToGroup(groupName, fileName, path) {
     if (groups[groupName]) {
         const fileAlreadyExists = groups[groupName].files.some(file => file.path === path);
         if (!fileAlreadyExists) {
+            // Remove file from previous group
+            const existingGroup = findGroupForFile(fileName);
+            if (existingGroup) removeFromGroup(existingGroup, fileName);
             groups[groupName].files.push({
                 name: fileName,
                 path: path,
             });
-            updateWebviewContent();
             vscode.window.showInformationMessage(`File added to group ${groupName}.`);
         } else {
             vscode.window.showWarningMessage(`File is already in this group.`);
@@ -422,7 +402,11 @@ function removeFromGroup(groupName, fileName) {
         const fileIndex = groups[groupName].files.findIndex(file => file.name === fileName);
         if (fileIndex !== -1) {
             groups[groupName].files.splice(fileIndex, 1);
-            updateWebviewContent();
+            // Check if the group is empty and remove it
+            if (groups[groupName].files.length === 0) {
+                if (debug) console.log('Group is empty, removing it:', groupName);
+                delete groups[groupName];
+            }
             vscode.window.showInformationMessage(`File ${fileName} removed from group '${groupName}'.`);
         } else {
             vscode.window.showWarningMessage(`File ${fileName} is not in group '${groupName}'.`);
@@ -449,8 +433,7 @@ function getOpenFiles(exclude_grouped = true) {
     if (debug) console.log('Getting open files, exclude_grouped:', exclude_grouped);
     const allOpenFiles = vscode.window.tabGroups.all
         .flatMap(group => group.tabs)
-        .filter(tab => tab.input && tab.input.uri) // Exclude tabs without file
-        .filter(tab => tab.label !== panelTitle) // Exclude the tabs groups manager itself
+        .filter(tab => tab.input && tab.input.uri); // Exclude tabs without file
     const groupedFiles = Object.values(groups).flatMap(group => group.files.map(file => file.path));
     var openFiles = allOpenFiles;
     if (exclude_grouped) {
@@ -470,168 +453,11 @@ function isFileOpened(path) {
 }
 
 /**
- * Generate Webview HTML content.
- * @returns {string} HTML string.
+ * Write on VSCode file to insert custom CSS and JS.
+ * @param {string} scriptContent Script content.
+ * @param {string} styleContent Style content.
+ * @returns {void}
  */
-function getWebviewContent() {
-    if (debug) console.log('Generating webview content');
-    const openFiles = getOpenFiles();
-    const groupsHtml = Object.entries(groups)
-        .map(([groupName, group]) => {
-            const filesHtml = group.files
-                .map(file => `
-                    <li>
-                        ${file.name} 
-                        <button onclick="removeFile('${groupName}', '${file.name}')">Remove</button>
-                        <button onclick="showFile('${groupName}', '${file.path}')">Show</button>
-                        <button onclick="hideFile('${groupName}', '${file.path}')">Hide</button>
-                    </li>
-                `)
-                .join('');
-            return `
-                <div class="group" style="border: 2px solid ${group.color}; margin: 10px; padding: 10px;"
-                    ondrop="drop(event, '${groupName}')" ondragover="allowDrop(event)">
-                    <h3 style="color: #e8e8e8;">${groupName} (${group.files.length})</h3>
-                    <ul>${filesHtml}</ul>
-                    <button onclick="removeGroup('${groupName}')">Delete Group</button>
-                    <button onclick="showGroupTabs('${groupName}')">Show All</button>
-                    <button onclick="hideGroupTabs('${groupName}')">Hide All</button>
-                </div>`;
-        })
-        .join('');
-    // Create open files list
-    var filesHtml = '';
-    if (openFiles.length > 0) {
-        filesHtml = openFiles.map(file => `
-            <div class="file" draggable="true" ondragstart="drag(event, '${file.label}', '${file.input.uri.fsPath}')">${file.label}</div>
-        `).join('');
-    }
-    return `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>${panelTitle}</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    padding: 10px;
-                }
-                .file {
-                    padding: 10px;
-                    margin: 5px 0;
-                    background-color: #007acc;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: grab;
-                    text-align: center;
-                }
-                .file:hover {
-                    background-color: #005f99;
-                }
-                .group {
-                    padding: 10px;
-                    border-radius: 5px;
-                    background-color: #1e1e1e;
-                }
-                .group ul {
-                    padding-left: 20px;
-                }
-                .group ul li {
-                    list-style-type: disc;
-                    color: white;
-                }
-                #open-files section {
-                    display: flex;
-                    gap: 0.65rem;
-                    justify-content: left;
-                    vertical-align: center;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>${panelTitle}</h1>
-            <div id="groups">
-                <h2>Groups</h2>
-                <button onclick="vscode.postMessage({ command: 'createGroup' })">Create Group</button>
-                ${groupsHtml}
-            </div>
-            <div id="open-files">
-                ${filesHtml !== '' ? '<h2>Open tabs</h2>' : ''}
-                <section>
-                    ${filesHtml}
-                </section>
-            </div>
-            <script>
-                const vscode = acquireVsCodeApi();
-                function allowDrop(event) { event.preventDefault(); }
-                function drag(event, fileName, path) {
-                    var data = {};
-                    data.fileName = fileName;
-                    data.path = path;
-                    event.dataTransfer.setData("text/plain", JSON.stringify(data));
-                }
-                function drop(event, groupName, path) {
-                    event.preventDefault();
-                    var data = event.dataTransfer.getData("text/plain");
-                    data = JSON.parse(data);
-                    vscode.postMessage({
-                        command: 'addFileToGroup',
-                        group: groupName,
-                        file: data.fileName,
-                        path: data.path,
-                    });
-                }
-                function removeFile(groupName, fileName) {
-                    vscode.postMessage({ command: 'removeFileFromGroup', group: groupName, file: fileName });
-                }
-                function showFile(groupName, filePath) {
-                    vscode.postMessage({ command: 'showFileFromGroup', group: groupName, filePath: filePath });
-                }
-                function hideFile(groupName, filePath) {
-                    vscode.postMessage({ command: 'hideFileFromGroup', group: groupName, filePath: filePath });
-                }
-                function removeGroup(groupName) {
-                    vscode.postMessage({ command: 'removeGroup', group: groupName });
-                }
-                function showGroupTabs(groupName) {
-                    vscode.postMessage({ command: 'showGroupTabs', group: groupName });
-                }
-                function hideGroupTabs(groupName) {
-                    vscode.postMessage({ command: 'hideGroupTabs', group: groupName });
-                }
-            </script>
-        </body>
-        </html>
-    `;
-}
-
-/**
- * Update Webview Content UI.
- */
-function updateWebviewContent() {
-    if (activePanel) {
-        const dynamicStyleContent = Object.entries(groups)
-        .map(([groupName, group]) => `
-            .tab-${groupName} {
-                    border-top: 3px solid ${group.color};
-            }
-        `).join('');
-        const updatedStyleContent = `
-            ${dynamicStyleContent}
-        `;
-        styleContent = updatedStyleContent;
-        if (style) {
-            style.html(updatedStyleContent);
-        } else {
-            writeOnVsCode(scriptContent, updatedStyleContent);
-        }
-        activePanel.webview.html = getWebviewContent();
-    }
-}
-
 function writeOnVsCode(scriptContent, styleContent) {
     const appDir = require.main
 		? path.dirname(require.main.filename)
@@ -673,9 +499,9 @@ function writeOnVsCode(scriptContent, styleContent) {
         // Set new layout
         fs.writeFile(htmlPath, $.html(), (err) => {
             if (err) {
-                console.error('Error saving VSCode file', err);
+                if (debug) console.error('Error saving VSCode file', err);
             } else {
-                console.log('VSCode File Correctly Saved')
+                if (debug) console.log('VSCode File Correctly Saved')
             }
         });
     })
