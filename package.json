@@ -10,7 +10,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "extension.installCustomCSS"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -31,6 +32,13 @@
           "command": "extension.addFileToGroupFromExplorer",
           "when": "resourceLangId != 'folder'",
           "group": "1_main"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "extension.addFileToGroupFromExplorer",
+          "when": "resourceScheme == 'file'",
+          "group": "navigation"
         }
       ]
     }

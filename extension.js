@@ -3,6 +3,9 @@ const fs = require("fs");
 const cheerio = require('cheerio');
 const path = require("path");
 
+const tabBgLeftSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-left.svg'), 'utf8');
+const tabBgRightSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-right.svg'), 'utf8');
+
 var groups = {};
 var subscriptions = [];
 var activePanel;
@@ -11,12 +14,101 @@ const panelId = 'tabGroupManager';
 const panelTitle = 'Tabs Groups Manager';
 const styleId = 'grouped-tabs-style';
 var styleContent = `
-    
+/* Disable VSCode native tab drag-and-drop indicator */
+.monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab.drop-target-left:after,
+.monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab.drop-target-right:before {
+    background-color: transparent;
+}
+
+/* Tab drag-and-drop */
+.tab.drop-target-right:not([aria-selected='true']) .rounded-left-border,
+.tab.drop-target-left:not([aria-selected='true']) .rounded-right-border {
+    stroke: var(--vscode-tab-dragAndDropBorder)
+}
+
+/* Tab rounded borders */
+.rounded-left-border, .rounded-right-border {
+    position: absolute;
+    width: 30px;
+    height: 35px;
+    overflow: hidden;
+    color: var(--vscode-tab-inactiveBackground);
+}
+
+.rounded-right-border { right: -15px; }
+
+.rounded-left-border { left: -15px; }
+
+/* Set active color */
+.tab.active .rounded-left-border,
+.tab.active .rounded-right-border {
+    color: var(--vscode-tab-activeBackground);
+}
+
+.rounded-right-border svg,
+.rounded-left-border svg {
+    width: inherit;
+    height: inherit;
+    stroke-width: 2;
+}
+
+/* Tab space-between */
+.tab {
+    margin-left: 14px;
+    margin-right: 14px;
+}
+
+/* 
+    Tab hover effect
+    - Change the color of the rounded borders to the tab background color
+    - Via JS we set the --tab-border-hover-color variable to the tab background color (Necessary to work with all VSCode Themes)
+*/
+.monaco-workbench .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab:not(.selected):hover .rounded-left-border,
+.monaco-workbench .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab:not(.selected):hover .rounded-right-border {
+    color: var(--tab-border-hover-color) !important;
+}
 `;
 var style = null;
 const scriptId = 'grouped-tabs-script';
 var scriptContent = `
+    (function() {
+        function updateTabsBackground() {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                let tabColor = getComputedStyle(tab).backgroundColor;
+                if (!tab.querySelector('.rounded-left-border')) {
+                    createRoundedBorderDiv(tab, 'rounded-left-border', \`${tabBgLeftSvg}\`);
+                }
+                if (!tab.querySelector('.rounded-right-border')) {
+                    createRoundedBorderDiv(tab, 'rounded-right-border', \`${tabBgRightSvg}\`);
+                }
+            });
+        }
 
+        function createRoundedBorderDiv(tab, className, svgContent) {
+            let roundedBorderDiv = document.createElement('div');
+            roundedBorderDiv.className = className;
+            roundedBorderDiv.innerHTML = svgContent;
+            tab.appendChild(roundedBorderDiv);
+            tab.addEventListener('mouseover', () => {
+                const backgroundColor = getComputedStyle(tab).backgroundColor;
+                roundedBorderDiv.style.setProperty('--tab-border-hover-color', backgroundColor);
+            });
+        }
+
+        // Create an observer to detect when the tabs are loaded
+        const tabsObserver = new MutationObserver((mutationsList, observer) => {
+            mutationsList.forEach(mutation => {
+                if (mutation.addedNodes.length > 0) {
+                    updateTabsBackground();
+                }
+            });
+        });
+        tabsObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Initial call to update existing tabs
+        updateTabsBackground();
+    })();
 `;
 var script = null;
 var htmlPath = null;
@@ -25,6 +117,9 @@ var htmlPath = null;
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+    // Ensure that the extension is enabled
+    const config = vscode.workspace.getConfiguration();
+    config.update('vscode_custom_css.enabled', true, vscode.ConfigurationTarget.Global);
     writeOnVsCode(scriptContent, styleContent);
     // Create a status bar item (button)
     const statusBarButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
