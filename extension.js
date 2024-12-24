@@ -3,6 +3,8 @@ const fs = require("fs");
 const cheerio = require('cheerio');
 const path = require("path");
 
+const debug = true; // Variable de depuración
+
 const tabBgLeftSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-left.svg'), 'utf8');
 const tabBgRightSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-right.svg'), 'utf8');
 
@@ -141,7 +143,7 @@ function activate(context) {
             );
             activePanel.webview.html = getWebviewContent();
             activePanel.webview.onDidReceiveMessage(async (message) => {
-                console.debug('Message received from webview:', message);
+                if (debug) console.log('Message received from webview:', message);
                 switch (message.command) {
                     case 'createGroup': {
                         vscode.window.showInputBox({ prompt: 'Enter new group name' })
@@ -156,7 +158,7 @@ function activate(context) {
                     case 'removeGroup': {
                         const { group } = message;
                         if (group) {
-                            console.debug('Removing group:', group);
+                            if (debug) console.log('Removing group:', group);
                             removeGroup(group);
                         } else {
                             vscode.window.showErrorMessage('Error: group not specified.');
@@ -166,7 +168,7 @@ function activate(context) {
                     case 'showGroupTabs': {
                         const { group } = message;
                         if (group) {
-                            console.debug('Showing all tabs of group:', group);
+                            if (debug) console.log('Showing all tabs of group:', group);
                             await showGroupTabs(group);
                         } else {
                             vscode.window.showErrorMessage('Error: group not specified.');
@@ -176,7 +178,7 @@ function activate(context) {
                     case 'hideGroupTabs': {
                         const { group } = message;
                         if (group) {
-                            console.debug('Hiding all tabs of group:', group);
+                            if (debug) console.log('Hiding all tabs of group:', group);
                             await hideGroupTabs(group);
                         } else {
                             vscode.window.showErrorMessage('Error: group not specified.');
@@ -186,17 +188,17 @@ function activate(context) {
                     case 'addFileToGroup': {
                         const { group, file, path } = message;
                         if (group && file) {
-                            console.debug('Adding file ' + file + ' to group ' + group)
+                            if (debug) console.log('Adding file ' + file + ' to group ' + group);
                             addToGroup(group, file, path);
                         } else {
-                            vscode.window.showErrorMessage('Error: group or file not specified.')
+                            vscode.window.showErrorMessage('Error: group or file not specified.');
                         }
                         break;
                     }
                     case 'removeFileFromGroup': {
                         const { group, file } = message;
                         if (group && file) {
-                            console.debug('Removing file ' + file + ' from group ' + group);
+                            if (debug) console.log('Removing file ' + file + ' from group ' + group);
                             removeFromGroup(group, file);
                         } else {
                             vscode.window.showErrorMessage('Error: group or file not specified.');
@@ -286,6 +288,7 @@ function activate(context) {
  * @param {string} path File path.
  */
 async function openFile(path) {
+    if (debug) console.log('Opening file:', path);
     const uri = vscode.Uri.file(path);
     vscode.workspace.openTextDocument(uri).then(async doc => {
         await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, preview: false });
@@ -297,6 +300,7 @@ async function openFile(path) {
  * @param {string} path File path.
  */
 async function closeFile(path) {
+    if (debug) console.log('Closing file:', path);
     const openFiles = getOpenFiles(false);
     const targetFile = openFiles.find(file => file.input.uri.fsPath === path);
     try {
@@ -327,6 +331,7 @@ function findGroupForFile(fileName) {
  * @param {string} name Group name.
  */
 function createGroup(name) {
+    if (debug) console.log('Creating group:', name);
     const color = getRandomColor();
     groups[name] = { color, files: [] };
     vscode.window.showInformationMessage(`Group ${name} created successfully.`);
@@ -337,6 +342,7 @@ function createGroup(name) {
  * @param {string} groupName Group name.
  */
 function removeGroup(groupName) {
+    if (debug) console.log('Removing group:', groupName);
     if (groups[groupName]) {
         delete groups[groupName];
         updateWebviewContent();
@@ -351,6 +357,7 @@ function removeGroup(groupName) {
  * @param {string} groupName Group name.
  */
 async function showGroupTabs(groupName) {
+    if (debug) console.log('Showing tabs for group:', groupName);
     if (groups[groupName]) {
         for (const file of groups[groupName].files) {
             await openFile(file.path); // Asegura que se abra cada archivo antes de continuar
@@ -367,6 +374,7 @@ async function showGroupTabs(groupName) {
  * @param {string} groupName Group name.
  */
 async function hideGroupTabs(groupName) {
+    if (debug) console.log('Hiding tabs for group:', groupName);
     if (groups[groupName]) {
         for (const file of groups[groupName].files) {
             await closeFile(file.path);
@@ -385,6 +393,7 @@ async function hideGroupTabs(groupName) {
  * @param {string} path File absolute path.
  */
 function addToGroup(groupName, fileName, path) {
+    if (debug) console.log('Adding file to group:', groupName, fileName, path);
     if (groups[groupName]) {
         const fileAlreadyExists = groups[groupName].files.some(file => file.path === path);
         if (!fileAlreadyExists) {
@@ -408,6 +417,7 @@ function addToGroup(groupName, fileName, path) {
  * @param {string} fileName File name.
  */
 function removeFromGroup(groupName, fileName) {
+    if (debug) console.log('Removing file from group:', groupName, fileName);
     if (groups[groupName]) {
         const fileIndex = groups[groupName].files.findIndex(file => file.name === fileName);
         if (fileIndex !== -1) {
@@ -436,6 +446,7 @@ function getRandomColor() {
  * @returns {vscode.Tab[]} Tabs array.
  */
 function getOpenFiles(exclude_grouped = true) {
+    if (debug) console.log('Getting open files, exclude_grouped:', exclude_grouped);
     const allOpenFiles = vscode.window.tabGroups.all
         .flatMap(group => group.tabs)
         .filter(tab => tab.input && tab.input.uri) // Exclude tabs without file
@@ -454,6 +465,7 @@ function getOpenFiles(exclude_grouped = true) {
  * @returns {boolean} Returns true when file is already opened.
  */
 function isFileOpened(path) {
+    if (debug) console.log('Checking if file is opened:', path);
     return getOpenFiles(false).some(openFile => openFile.input.uri.fsPath === path);
 }
 
@@ -462,6 +474,7 @@ function isFileOpened(path) {
  * @returns {string} HTML string.
  */
 function getWebviewContent() {
+    if (debug) console.log('Generating webview content');
     const openFiles = getOpenFiles();
     const groupsHtml = Object.entries(groups)
         .map(([groupName, group]) => {
