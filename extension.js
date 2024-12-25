@@ -148,23 +148,23 @@ function activate(context) {
     subscriptions.push(fileContextMenuCommand);
 
     // * Tab right-click context menu command
-    const tabContextMenuCommand = vscode.commands.registerCommand('extension.addFileToNewGroupFromTab', async () => {
+    const tabContextMenuCommand = vscode.commands.registerCommand('extension.addFileToNewGroupFromTab', async (uri) => {
         const activeEditor = vscode.window.activeTextEditor;
         if (!activeEditor) return;
-        const uri = activeEditor.document.uri;
+        if (typeof uri === 'undefined') return;
         const fileName = uri.fsPath.split('/').pop();
         tabRightClickProcedure(fileName, uri, context);
     });
     subscriptions.push(tabContextMenuCommand);
 
     // Hack to set different titles to menu context labels (for the same command)
-    vscode.commands.registerCommand('extension.addFileToGroupFromTab', async () => {
-        vscode.commands.executeCommand('extension.addFileToNewGroupFromTab');
+    vscode.commands.registerCommand('extension.addFileToGroupFromTab', async (uri) => {
+        vscode.commands.executeCommand('extension.addFileToNewGroupFromTab', uri);
     });
 
     // Add context menu for adding tab to another group
-    vscode.commands.registerCommand('extension.addTabToGroup', async () => {
-        vscode.commands.executeCommand('extension.addFileToNewGroupFromTab');
+    vscode.commands.registerCommand('extension.addTabToGroup', async (uri) => {
+        vscode.commands.executeCommand('extension.addFileToNewGroupFromTab', uri);
     });
 
     // * Tab Submenu commands
@@ -242,7 +242,7 @@ async function tabRightClickProcedure(fileName, uri, context) {
         if (selectedGroup === 'Create New Group') {
             createGroupProcedure(fileName, uri.fsPath, context);
         } else if (selectedGroup) {
-            addToGroup(selectedGroup, fileName, uri.fsPath);
+            addToGroup(selectedGroup, fileName, uri.fsPath, context);
         }
     } else {
         createGroupProcedure(fileName, uri.fsPath, context);
@@ -257,7 +257,7 @@ async function createGroupProcedure(fileName, path, context) {
     const groupName = await vscode.window.showInputBox({ prompt: 'Enter new group name' });
     if (groupName) {
         createGroup(groupName, context);
-        addToGroup(groupName, fileName, path);
+        addToGroup(groupName, fileName, path, context);
     }
 }
 
@@ -402,7 +402,7 @@ async function hideGroupTabs(groupName) {
  * @param {string} fileName File name.
  * @param {string} path File absolute path.
  */
-function addToGroup(groupName, fileName, path) {
+function addToGroup(groupName, fileName, path, context) {
     if (debug) console.log('Adding file to group:', groupName, fileName, path);
     if (groups[groupName]) {
         const fileAlreadyExists = groups[groupName].files.some(file => file.path === path);
