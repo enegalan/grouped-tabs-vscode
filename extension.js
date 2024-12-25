@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const fs = require("fs");
 const cheerio = require('cheerio');
 const path = require("path");
+const os = require("os");
 
 const debug = true;
 
@@ -72,44 +73,52 @@ var styleContent = `
 `;
 const scriptId = 'grouped-tabs-script';
 var scriptContent = `
-    (function() {
-        function updateTabsBackground() {
-            const tabs = document.querySelectorAll('.tab');
-            tabs.forEach(tab => {
-                let tabColor = getComputedStyle(tab).backgroundColor;
-                if (!tab.querySelector('.rounded-left-border')) {
-                    createRoundedBorderDiv(tab, 'rounded-left-border', \`${tabBgLeftSvg}\`);
-                }
-                if (!tab.querySelector('.rounded-right-border')) {
-                    createRoundedBorderDiv(tab, 'rounded-right-border', \`${tabBgRightSvg}\`);
-                }
-            });
-        }
+    const updateTabsBackground = () => {
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach(tab => {
+            let tabColor = getComputedStyle(tab).backgroundColor;
+            if (!tab.querySelector('.rounded-left-border')) {
+                createRoundedBorderDiv(tab, 'rounded-left-border', \`${tabBgLeftSvg}\`);
+            }
+            if (!tab.querySelector('.rounded-right-border')) {
+                createRoundedBorderDiv(tab, 'rounded-right-border', \`${tabBgRightSvg}\`);
+            }
+        });
+    };
 
-        function createRoundedBorderDiv(tab, className, svgContent) {
-            let roundedBorderDiv = document.createElement('div');
-            roundedBorderDiv.className = className;
-            roundedBorderDiv.innerHTML = svgContent;
-            tab.appendChild(roundedBorderDiv);
-            tab.addEventListener('mouseover', () => {
-                const backgroundColor = getComputedStyle(tab).backgroundColor;
-                roundedBorderDiv.style.setProperty('--tab-border-hover-color', backgroundColor);
-            });
-        }
+    const createRoundedBorderDiv = (tab, className, svgContent) => {
+        let roundedBorderDiv = document.createElement('div');
+        roundedBorderDiv.className = className;
+        roundedBorderDiv.innerHTML = svgContent;
+        tab.appendChild(roundedBorderDiv);
+        tab.addEventListener('mouseover', () => {
+            const backgroundColor = getComputedStyle(tab).backgroundColor;
+            roundedBorderDiv.style.setProperty('--tab-border-hover-color', backgroundColor);
+        });
+    };
 
-        // Create an observer to detect when the tabs are loaded
+    const getTabByAriaLabel = (ariaLabel) => {
+        return document.querySelector('[aria-label*="' + ariaLabel + '"]') || null;
+    };
+
+    const onTabsLoad = (callback) => {
+        if (typeof callback !== 'function') return;
         const tabsObserver = new MutationObserver((mutationsList, observer) => {
             mutationsList.forEach(mutation => {
                 if (mutation.addedNodes.length > 0) {
-                    updateTabsBackground();
+                    setTimeout(callback, 1000);
+                    observer.disconnect();
                 }
             });
         });
         tabsObserver.observe(document.body, { childList: true, subtree: true });
+    };
 
-        // Initial call to update existing tabs
-        updateTabsBackground();
-    })();
+    // Create an observer to detect when the tabs are loaded
+    onTabsLoad(updateTabsBackground);
+
+    // Initial call to update existing tabs
+    updateTabsBackground();
 `;
 var script = null;
 var htmlPath = null;
@@ -130,7 +139,7 @@ function activate(context) {
         if (existingGroup) {
             openFile(uri.fsPath);
         } else {
-            tabRightClickProcedure(fileName, uri);
+            tabRightClickProcedure(fileName, uri, context);
         }
     });
     subscriptions.push(fileContextMenuCommand);
@@ -141,7 +150,7 @@ function activate(context) {
         if (!activeEditor) return;
         const uri = activeEditor.document.uri;
         const fileName = uri.fsPath.split('/').pop();
-        tabRightClickProcedure(fileName, uri);
+        tabRightClickProcedure(fileName, uri, context);
     });
     subscriptions.push(tabContextMenuCommand);
 
@@ -162,7 +171,7 @@ function activate(context) {
         if (activeEditor) {
             const uri = activeEditor.document.uri;
             const fileName = uri.fsPath.split('/').pop();
-            createGroupProcedure(fileName, uri.fsPath);
+            createGroupProcedure(fileName, uri.fsPath, context);
         }
     });
     subscriptions.push(createGroupCommand);
@@ -175,58 +184,70 @@ function activate(context) {
         const selectedGroup = await vscode.window.showQuickPick(deletableGroups, {
             placeHolder: 'Select a group to delete',
         });
-        if (selectedGroup) removeGroup(selectedGroup);
+        if (selectedGroup) removeGroup(selectedGroup, context);
     });
     subscriptions.push(deleteGroupCommand);
 
     // Visible editors changes listener
     vscode.window.onDidChangeVisibleTextEditors(() => {
-        updateContext();
+        updateContext(context);
     });
     // Active editor changes listener
     vscode.window.onDidChangeActiveTextEditor(() => {
-        updateContext();
+        updateContext(context);
     });
     // Editor closes listener
     vscode.workspace.onDidCloseTextDocument(() => {
-        updateContext();
+        updateContext(context);
     });
     // Window state changes listener
     vscode.window.onDidChangeWindowState(() => {
-        updateContext();
+        updateContext(context);
     });
-    updateContext();
+    updateContext(context);
     // Add subscriptions / commands
     subscriptions.forEach(subscription => context.subscriptions.push(subscription));
 }
 
 /**
+ * Get environment variable.
+ */
+function env(key) {
+    const variables = {
+        userHome: () => os.homedir(),
+        execPath: () => process.env.VSCODE_EXEC_PATH ?? process.execPath,
+    };
+    if (key in variables) return variables[key]();
+    return process.env[key];
+}
+
+/**
  * Procedure for tab right-click context menu.
  */
-async function tabRightClickProcedure(fileName, uri) {
+async function tabRightClickProcedure(fileName, uri, context) {
     const groupNames = Object.keys(groups);
     if (groupNames.length > 0) {
         const selectedGroup = await vscode.window.showQuickPick([...groupNames, 'Create New Group'], {
             placeHolder: 'Select a group or create a new one',
         });
         if (selectedGroup === 'Create New Group') {
-            createGroupProcedure(fileName, uri.fsPath);
+            createGroupProcedure(fileName, uri.fsPath, context);
         } else if (selectedGroup) {
             addToGroup(selectedGroup, fileName, uri.fsPath);
         }
     } else {
-        createGroupProcedure(fileName, uri.fsPath);
+        createGroupProcedure(fileName, uri.fsPath, context);
     }
-    updateContext();
+    updateContext(context);
 }
 
 /**
  * Procedure for creating groups.
  */
-async function createGroupProcedure(fileName, path) {
+async function createGroupProcedure(fileName, path, context) {
     const groupName = await vscode.window.showInputBox({ prompt: 'Enter new group name' });
     if (groupName) {
-        createGroup(groupName);
+        createGroup(groupName, context);
         addToGroup(groupName, fileName, path);
     }
 }
@@ -234,7 +255,7 @@ async function createGroupProcedure(fileName, path) {
 /**
  * Updates the context of the extension.
  */
-function updateContext() {
+function updateContext(context) {
     const groupNames = Object.keys(groups);
     vscode.commands.executeCommand('setContext', 'hasGroups', groupNames.length > 0);
     // Get grouped files names
@@ -309,24 +330,24 @@ function findGroupForFile(fileName) {
  * Create a group with a name and a random color.
  * @param {string} name Group name.
  */
-function createGroup(name) {
+function createGroup(name, context) {
     if (debug) console.log('Creating group:', name);
     const color = getRandomColor();
     groups[name] = { color, files: [] };
     vscode.window.showInformationMessage(`Group ${name} created successfully.`);
-    updateContext();
+    updateContext(context);
 }
 
 /**
  * Removes a group.
  * @param {string} groupName Group name.
  */
-function removeGroup(groupName) {
+function removeGroup(groupName, context) {
     if (debug) console.log('Removing group:', groupName);
     if (groups[groupName]) {
         delete groups[groupName];
         vscode.window.showInformationMessage(`Group ${groupName} removed successfully.`);
-        updateContext();
+        updateContext(context);
     } else {
         vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
     }
@@ -382,6 +403,7 @@ function addToGroup(groupName, fileName, path) {
                 name: fileName,
                 path: path,
             });
+            paintTabsGrouping();
             vscode.window.showInformationMessage(`File added to group ${groupName}.`);
         } else {
             vscode.window.showWarningMessage(`File is already in this group.`);
@@ -389,6 +411,46 @@ function addToGroup(groupName, fileName, path) {
     } else {
         vscode.window.showErrorMessage(`Group ${groupName} does not exists.`);
     }
+}
+/**
+ * Parse URI path for finding VSCode DOM tab given a a path.
+ * @param {string} path Absolute path that is pretended to find a DOM tab with aria-label attribute.
+ */
+function parseTabAriaLabel(path) {
+    const userHome = env('userHome');
+    // TODO: Investigate on differents OS if '~/' works, if not a condition is needed here
+    return path.replace(userHome + '/', '~/');
+}
+
+function paintTabsGrouping() {
+    var scriptToInject = scriptContent;
+    const openFiles = getOpenFiles(false);
+    openFiles.forEach(file => {
+        let arialabel = parseTabAriaLabel(file.input.uri.fsPath);
+        const groupName = findGroupForFile(file.input.uri.fsPath.split('/').pop());
+        if (groupName) {
+            // TODO: Stylish and improve all in general
+            scriptToInject += `
+                function paintTabsGrouping() {
+                    var tab = getTabByAriaLabel("${arialabel}");
+                    if (${debug}) console.log('[paintTabsGrouping] Trying to get tab with aria-label:', "${arialabel}", tab);
+                    if (tab) {
+                        tab.classList.add('grouped-tab');
+                        var groupDiv = document.getElementById('group-${groupName}');
+                        if (!groupDiv) {
+                            groupDiv = document.createElement('div');
+                            groupDiv.id = 'group-${groupName}';
+                            groupDiv.className = 'tabs-group';
+                            tab.parentNode.insertBefore(groupDiv, tab);
+                        }
+                        groupDiv.appendChild(tab);
+                    }
+                }
+                onTabsLoad(paintTabsGrouping);
+            `;
+        }
+    });
+    writeOnVsCode(scriptToInject, styleContent, true);
 }
 
 /**
@@ -458,7 +520,7 @@ function isFileOpened(path) {
  * @param {string} styleContent Style content.
  * @returns {void}
  */
-function writeOnVsCode(scriptContent, styleContent) {
+function writeOnVsCode(scriptContent, styleContent, hotReload = false) {
     const appDir = require.main
 		? path.dirname(require.main.filename)
 		: globalThis._VSCODE_FILE_ROOT;
@@ -480,11 +542,9 @@ function writeOnVsCode(scriptContent, styleContent) {
         script = $('#'+scriptId);
         // Clean old script
         let scriptExists = script.length;
-        if (scriptExists) {
-            script.remove();
-        }
+        if (scriptExists) script.remove();
         // Load script
-        scriptContent = `
+        let scriptToInject = `
             // Clear old style
             if (document.getElementById('${styleId}')) {
                 document.getElementById('${styleId}').remove();
@@ -495,7 +555,7 @@ function writeOnVsCode(scriptContent, styleContent) {
             styleElement.textContent = \`${styleContent}\`;
             document.head.append(styleElement);
         ` + scriptContent;
-        $('html').append('<script id="' + scriptId + '">'+scriptContent+'</script>');
+        $('html').append('<script id="' + scriptId + '">'+scriptToInject+'</script>');
         // Set new layout
         fs.writeFile(htmlPath, $.html(), (err) => {
             if (err) {
@@ -504,6 +564,8 @@ function writeOnVsCode(scriptContent, styleContent) {
                 if (debug) console.log('VSCode File Correctly Saved')
             }
         });
+        // Reload VSCode
+        if (hotReload) vscode.commands.executeCommand('workbench.action.reloadWindow');
     })
 }
 
