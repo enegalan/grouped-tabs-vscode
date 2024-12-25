@@ -122,6 +122,8 @@ var scriptContent = `
 `;
 var script = null;
 var htmlPath = null;
+const backupFileName = 'workbench.html.backup';
+
 /**
  * Activate extension.
  * @param {vscode.ExtensionContext} context
@@ -190,6 +192,22 @@ function activate(context) {
         if (selectedGroup) removeGroup(selectedGroup, context);
     });
     subscriptions.push(deleteGroupCommand);
+
+    // Command to restore VSCode backup
+    const restoreBackupCommand = vscode.commands.registerCommand('extension.restoreBackup', async () => {
+        try {
+            const backupPath = path.join(path.dirname(htmlPath), backupFileName);
+            if (fs.existsSync(backupPath)) {
+                fs.copyFileSync(backupPath, htmlPath);
+                vscode.window.showInformationMessage('Backup restored successfully. Please reload VSCode.');
+            } else {
+                vscode.window.showWarningMessage('No backup found to restore.');
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error restoring backup: ${error.message}`);
+        }
+    });
+    subscriptions.push(restoreBackupCommand);
 
     // Visible editors changes listener
     vscode.window.onDidChangeVisibleTextEditors(() => {
@@ -545,6 +563,11 @@ function writeOnVsCode(scriptContent, styleContent, hotReload = false) {
 	if (!fs.existsSync(htmlPath)) {
 		vscode.window.showInformationMessage('VSCode path not found!');
 	}
+    const backupPath = path.join(path.dirname(htmlPath), backupFileName);
+    if (!fs.existsSync(backupPath)) {
+        fs.copyFileSync(htmlPath, backupPath);
+        if (debug) console.log('Backup created successfully.');
+    }
     fs.readFile(htmlPath, 'utf8', (err, data) => {
         if (err) {
             console.error('Error while reading VSCode layout', err);
