@@ -114,7 +114,7 @@ var scriptContent = `
     };
 
     const getTabByAriaLabel = (ariaLabel) => {
-        return document.querySelector('[aria-label*="' + ariaLabel + '"]') || null;
+        return document.querySelector('[aria-label*="' + ariaLabel + '"]').parentElement || null;
     };
 
     const onTabsLoad = (callback) => {
@@ -247,6 +247,8 @@ function activate(context) {
             context.globalState.update('groups', groups);
         }
     });
+    // Paint tabs grouping on startup
+    paintTabsGrouping(false);
 }
 
 /**
@@ -445,7 +447,7 @@ function addToGroup(groupName, fileName, path, context) {
                 name: fileName,
                 path: path,
             });
-            paintTabsGrouping();
+            paintTabsGrouping(true);
             vscode.window.showInformationMessage(getMessage('fileAddedToGroup', groupName));
             context.globalState.update('groups', groups);
         } else {
@@ -465,14 +467,13 @@ function parseTabAriaLabel(path) {
     return path.replace(userHome + '/', '~/');
 }
 
-function paintTabsGrouping() {
+function paintTabsGrouping(hotReload = false) {
     var scriptToInject = scriptContent;
     const openFiles = getOpenFiles(false);
     openFiles.forEach(file => {
         let arialabel = parseTabAriaLabel(file.input.uri.fsPath);
         const groupName = findGroupForFile(file.input.uri.fsPath.split('/').pop());
         if (groupName) {
-            // TODO: Stylish and improve all in general
             scriptToInject += `
                 function paintTabsGrouping() {
                     var tab = getTabByAriaLabel("${arialabel}");
@@ -493,7 +494,7 @@ function paintTabsGrouping() {
             `;
         }
     });
-    writeOnVsCode(scriptToInject, styleContent, true);
+    writeOnVsCode(scriptToInject, styleContent, hotReload);
 }
 
 /**
