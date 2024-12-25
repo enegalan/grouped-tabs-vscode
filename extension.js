@@ -9,6 +9,22 @@ const debug = true;
 const tabBgLeftSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-left.svg'), 'utf8');
 const tabBgRightSvg = fs.readFileSync(path.join(__dirname, 'src', 'tab-bg-right.svg'), 'utf8');
 
+const messages = require('./messages.json');
+
+/**
+ * Get formatted message.
+ * @param {string} key Message key.
+ * @param {...string} params Parameters to replace in the message.
+ * @returns {string} Formatted message.
+ */
+function getMessage(key, ...params) {
+    let message = messages[key];
+    if (!message) return key;
+    return message.replace(/{(\d+)}/g, (match, number) => {
+        return typeof params[number] !== 'undefined' ? params[number] : match;
+    });
+}
+
 var groups = {};
 var subscriptions = [];
 const styleId = 'grouped-tabs-style';
@@ -358,7 +374,7 @@ function createGroup(name, context) {
     if (debug) console.log('Creating group:', name);
     const color = getRandomColor();
     groups[name] = { color, files: [] };
-    vscode.window.showInformationMessage(`Group ${name} created successfully.`);
+    vscode.window.showInformationMessage(getMessage('groupCreated', name));
     updateContext(context);
     context.globalState.update('groups', groups);
 }
@@ -371,11 +387,11 @@ function removeGroup(groupName, context) {
     if (debug) console.log('Removing group:', groupName);
     if (groups[groupName]) {
         delete groups[groupName];
-        vscode.window.showInformationMessage(`Group ${groupName} removed successfully.`);
+        vscode.window.showInformationMessage(getMessage('groupRemoved', groupName));
         updateContext(context);
         context.globalState.update('groups', groups);
     } else {
-        vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
+        vscode.window.showErrorMessage(getMessage('groupDoesNotExist', groupName));
     }
 }
 
@@ -430,13 +446,13 @@ function addToGroup(groupName, fileName, path, context) {
                 path: path,
             });
             paintTabsGrouping();
-            vscode.window.showInformationMessage(`File added to group ${groupName}.`);
+            vscode.window.showInformationMessage(getMessage('fileAddedToGroup', groupName));
             context.globalState.update('groups', groups);
         } else {
-            vscode.window.showWarningMessage(`File is already in this group.`);
+            vscode.window.showWarningMessage(getMessage('fileAlreadyInGroup'));
         }
     } else {
-        vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
+        vscode.window.showErrorMessage(getMessage('groupDoesNotExist', groupName));
     }
 }
 /**
@@ -496,13 +512,13 @@ function removeFromGroup(groupName, fileName) {
                 if (debug) console.log('Group is empty, removing it:', groupName);
                 delete groups[groupName];
             }
-            vscode.window.showInformationMessage(`File ${fileName} removed from group '${groupName}'.`);
+            vscode.window.showInformationMessage(getMessage('fileRemovedFromGroup', fileName, groupName));
             context.globalState.update('groups', groups);
         } else {
-            vscode.window.showWarningMessage(`File ${fileName} is not in group '${groupName}'.`);
+            vscode.window.showWarningMessage(getMessage('fileNotInGroup', fileName, groupName));
         }
     } else {
-        vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
+        vscode.window.showErrorMessage(getMessage('groupDoesNotExist', groupName));
     }
 }
 
@@ -558,12 +574,12 @@ function writeOnVsCode(scriptContent, styleContent, hotReload = false) {
 		htmlPath = path.join(base, "electron-sandbox", "workbench", "workbench.esm.html");
 	}
 	if (!fs.existsSync(htmlPath)) {
-		vscode.window.showInformationMessage('VSCode path not found!');
+		vscode.window.showInformationMessage(getMessage('vscodePathNotFound'));
 	}
     const backupPath = path.join(path.dirname(htmlPath), backupFileName);
     if (!fs.existsSync(backupPath)) {
         fs.copyFileSync(htmlPath, backupPath);
-        if (debug) console.log('Backup created successfully.');
+        if (debug) console.log(getMessage('backupCreated'));
     }
     fs.readFile(htmlPath, 'utf8', (err, data) => {
         if (err) {

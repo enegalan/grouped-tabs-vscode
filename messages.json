@@ -1,0 +1,15 @@
+{
+    "groupCreated": "Group {0} created successfully.",
+    "groupRemoved": "Group {0} removed successfully.",
+    "fileAddedToGroup": "File added to group {0}.",
+    "fileAlreadyInGroup": "File is already in this group.",
+    "groupDoesNotExist": "Group {0} does not exist.",
+    "fileRemovedFromGroup": "File {0} removed from group '{1}'.",
+    "fileNotInGroup": "File {0} is not in group '{1}'.",
+    "backupCreated": "Backup created successfully.",
+    "backupRestored": "Backup restored successfully. Please reload VSCode.",
+    "noBackupFound": "No backup found to restore.",
+    "errorRestoringBackup": "Error restoring backup: {0}",
+    "errorClosingFile": "Error closing file {0}: {1}",
+    "vscodePathNotFound": "VSCode path not found!"
+}
