@@ -127,6 +127,9 @@ var htmlPath = null;
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+    // Load saved groups from global state
+    const savedGroups = context.globalState.get('groups', groups);
+    if (savedGroups) groups = savedGroups;
     // Ensure that the extension is enabled
     const config = vscode.workspace.getConfiguration();
     config.update('vscode_custom_css.enabled', true, vscode.ConfigurationTarget.Global);
@@ -207,6 +210,12 @@ function activate(context) {
     updateContext(context);
     // Add subscriptions / commands
     subscriptions.forEach(subscription => context.subscriptions.push(subscription));
+    // Save groups to global state on deactivate
+    context.subscriptions.push({
+        dispose: () => {
+            context.globalState.update('groups', groups);
+        }
+    });
 }
 
 /**
@@ -336,6 +345,7 @@ function createGroup(name, context) {
     groups[name] = { color, files: [] };
     vscode.window.showInformationMessage(`Group ${name} created successfully.`);
     updateContext(context);
+    context.globalState.update('groups', groups);
 }
 
 /**
@@ -348,6 +358,7 @@ function removeGroup(groupName, context) {
         delete groups[groupName];
         vscode.window.showInformationMessage(`Group ${groupName} removed successfully.`);
         updateContext(context);
+        context.globalState.update('groups', groups);
     } else {
         vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
     }
@@ -405,11 +416,12 @@ function addToGroup(groupName, fileName, path) {
             });
             paintTabsGrouping();
             vscode.window.showInformationMessage(`File added to group ${groupName}.`);
+            context.globalState.update('groups', groups);
         } else {
             vscode.window.showWarningMessage(`File is already in this group.`);
         }
     } else {
-        vscode.window.showErrorMessage(`Group ${groupName} does not exists.`);
+        vscode.window.showErrorMessage(`Group ${groupName} does not exist.`);
     }
 }
 /**
@@ -470,6 +482,7 @@ function removeFromGroup(groupName, fileName) {
                 delete groups[groupName];
             }
             vscode.window.showInformationMessage(`File ${fileName} removed from group '${groupName}'.`);
+            context.globalState.update('groups', groups);
         } else {
             vscode.window.showWarningMessage(`File ${fileName} is not in group '${groupName}'.`);
         }
