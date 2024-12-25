@@ -40,6 +40,10 @@
       {
         "command": "extension.deleteGroup",
         "title": "Remove group"
+      },
+      {
+        "command": "extension.restoreBackup",
+        "title": "Restore VSCode Backup"
       }
     ],
     "menus": {
