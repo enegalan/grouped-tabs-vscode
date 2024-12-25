@@ -132,9 +132,6 @@ function activate(context) {
     // Load saved groups from global state
     const savedGroups = context.globalState.get('groups', groups);
     if (savedGroups) groups = savedGroups;
-    // Ensure that the extension is enabled
-    const config = vscode.workspace.getConfiguration();
-    config.update('vscode_custom_css.enabled', true, vscode.ConfigurationTarget.Global);
     writeOnVsCode(scriptContent, styleContent);
     // * Right-click context menu command for files in explorer
     const fileContextMenuCommand = vscode.commands.registerCommand('extension.addFileToGroupFromExplorer', async (uri) => {
