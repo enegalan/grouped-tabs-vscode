@@ -114,11 +114,11 @@ var scriptContent = `
     };
 
     const getTabByAriaLabel = (ariaLabel) => {
-        let tab = document.querySelector('[aria-label*="' + ariaLabel + '"]')?.parentElement || null;
+        let tab = document.querySelector('.tabs-container [aria-label~="' + ariaLabel + '"]')?.parentElement;
         if (!tab) {
             // Try to get tab with filename only
             ariaLabel = ariaLabel.split('/').pop();
-            tab = document.querySelector('[aria-label*="' + ariaLabel + '"]') || null;
+            tab = document.querySelector('.tabs-container [aria-label~="' + ariaLabel + '"]') || null;
         }
         return tab;
     };
