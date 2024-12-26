@@ -213,6 +213,7 @@ function activate(context) {
             if (fs.existsSync(backupPath)) {
                 fs.copyFileSync(backupPath, htmlPath);
                 vscode.window.showInformationMessage('Backup restored successfully. Please reload VSCode.');
+                vscode.commands.executeCommand('workbench.action.reloadWindow');
             } else {
                 vscode.window.showWarningMessage('No backup found to restore.');
             }
