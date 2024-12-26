@@ -130,11 +130,22 @@ var scriptContent = `
         tabsObserver.observe(document.body, { childList: true, subtree: true });
     };
 
+    const onTabsContainerChanges = (callback) => {
+        const newTabObserver = new MutationObserver(() => {
+            callback();
+        });
+        let observe = () => newTabObserver.observe(document.querySelector('.tabs-container'), { childList: true });
+        onTabsLoad(observe);
+    };
+
     // Create an observer to detect when the tabs are loaded
     onTabsLoad(updateTabsBackground);
 
     // Initial call to update existing tabs
     updateTabsBackground();
+
+    // Observe for new tabs being added
+    onTabsContainerChanges(updateTabsBackground);
 `;
 var script = null;
 var htmlPath = null;
