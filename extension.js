@@ -484,14 +484,17 @@ function parseTabAriaLabel(path) {
 function paintTabsGrouping(hotReload = false) {
     var scriptToInject = scriptContent;
     const openFiles = getOpenFiles(false);
-    openFiles.forEach(file => {
+    openFiles.forEach((file, index) => {
         let arialabel = parseTabAriaLabel(file.input.uri.fsPath);
         const groupName = findGroupForFile(file.input.uri.fsPath.split('/').pop());
         if (groupName) {
+            console.log(`[paintTabsGrouping] Painting tab ${index}:`, arialabel, groupName);
             scriptToInject += `
-                function paintTabsGrouping() {
+                function paintTabsGroupingFor${index}() {
+                    console.log('[paintTabsGrouping${index}] Trying to get tab with aria-label:', "${arialabel}");
                     var tab = getTabByAriaLabel("${arialabel}");
-                    if (${debug}) console.log('[paintTabsGrouping] Trying to get tab with aria-label:', "${arialabel}", tab);
+                    console.log('[paintTabsGrouping${index}] Tab found:', tab);
+                    if (${debug}) console.log('[paintTabsGrouping${index}] Trying to get tab with aria-label:', "${arialabel}", tab);
                     if (tab) {
                         tab.classList.add('grouped-tab');
                         var groupDiv = document.getElementById('group-${groupName}');
@@ -504,7 +507,7 @@ function paintTabsGrouping(hotReload = false) {
                         groupDiv.appendChild(tab);
                     }
                 }
-                onTabsLoad(paintTabsGrouping);
+                onTabsLoad(paintTabsGroupingFor${index});
             `;
         }
     });
@@ -551,7 +554,7 @@ function getRandomColor() {
  * @returns {vscode.Tab[]} Tabs array.
  */
 function getOpenFiles(exclude_grouped = true) {
-    if (debug) console.log('Getting open files, exclude_grouped:', exclude_grouped);
+    if (debug) console.log('Getting open files, exclude_grouped:', exclude_grouped, vscode.window.tabGroups.all);
     const allOpenFiles = vscode.window.tabGroups.all
         .flatMap(group => group.tabs)
         .filter(tab => tab.input && tab.input.uri); // Exclude tabs without file
