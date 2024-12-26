@@ -122,7 +122,7 @@ var scriptContent = `
         const tabsObserver = new MutationObserver((mutationsList, observer) => {
             mutationsList.forEach(mutation => {
                 if (mutation.addedNodes.length > 0) {
-                    setTimeout(callback, 1000);
+                    setTimeout(callback, 5000);
                     observer.disconnect();
                 }
             });
