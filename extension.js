@@ -108,7 +108,7 @@ var styleContent = `
     position: relative;
     bottom: 0;
     height: 100%;
-    width: 100%;
+    width: auto;
 }
 
 .group-tab::before {
@@ -119,7 +119,7 @@ var styleContent = `
     border-radius: 5px;
     padding: 3px 6px;
     display: flex;
-    margin: 0 5px 0 10px;
+    margin: 0 10px 0 10px;
     align-items: center;
 }
 
