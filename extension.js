@@ -459,9 +459,11 @@ function addToGroup(groupName, fileName, path, context) {
                 name: fileName,
                 path: path,
             });
+            // Perform a CTRL + S to save the file and prevent from not painting the tab
+            vscode.commands.executeCommand('workbench.action.files.save');
+            context.globalState.update('groups', groups);
             paintTabsGrouping(true);
             vscode.window.showInformationMessage(getMessage('fileAddedToGroup', groupName));
-            context.globalState.update('groups', groups);
         } else {
             vscode.window.showWarningMessage(getMessage('fileAlreadyInGroup'));
         }
