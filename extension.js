@@ -114,7 +114,13 @@ var scriptContent = `
     };
 
     const getTabByAriaLabel = (ariaLabel) => {
-        return document.querySelector('[aria-label*="' + ariaLabel + '"]').parentElement || null;
+        let tab = document.querySelector('[aria-label*="' + ariaLabel + '"]')?.parentElement || null;
+        if (!tab) {
+            // Try to get tab with filename only
+            ariaLabel = ariaLabel.split('/').pop();
+            tab = document.querySelector('[aria-label*="' + ariaLabel + '"]') || null;
+        }
+        return tab;
     };
 
     const onTabsLoad = (callback) => {
