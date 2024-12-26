@@ -575,11 +575,11 @@ function isFileOpened(path) {
 
 /**
  * Write on VSCode file to insert custom CSS and JS.
- * @param {string} scriptContent Script content.
- * @param {string} styleContent Style content.
+ * @param {string} scriptContentToInject Script content.
+ * @param {string} styleContentToInject Style content.
  * @returns {void}
  */
-function writeOnVsCode(scriptContent, styleContent, hotReload = false) {
+function writeOnVsCode(scriptContentToInject, styleContentToInject, hotReload = false) {
     const appDir = require.main
 		? path.dirname(require.main.filename)
 		: globalThis._VSCODE_FILE_ROOT;
@@ -616,9 +616,9 @@ function writeOnVsCode(scriptContent, styleContent, hotReload = false) {
             // Load style
             const styleElement = document.createElement('style');
             styleElement.id = '${styleId}';
-            styleElement.textContent = \`${styleContent}\`;
+            styleElement.textContent = \`${styleContentToInject}\`;
             document.head.append(styleElement);
-        ` + scriptContent;
+        ` + scriptContentToInject;
         $('html').append('<script id="' + scriptId + '">'+scriptToInject+'</script>');
         // Set new layout
         fs.writeFile(htmlPath, $.html(), (err) => {
