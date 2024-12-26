@@ -73,8 +73,9 @@ var styleContent = `
 
 /* Tab space-between */
 .tab {
-    margin-left: 14px;
-    margin-right: 14px;
+    margin-left: 14px !important;
+    margin-right: 14px !important;
+    position: relative !important;
 }
 
 /* 
@@ -86,18 +87,81 @@ var styleContent = `
 .monaco-workbench .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab:not(.selected):hover .rounded-right-border {
     color: var(--tab-border-hover-color) !important;
 }
+
+/* Tabs group */
+.tabs-group {
+    display: flex;
+    align-items: center;
+}
+
+.tabs-group > * {
+    display: flex;
+}
+
+.tabs-group > * > .tab-label > * {
+    align-content: center;
+}
+
+.group-tab {
+    display: flex;
+    align-items: center;
+    position: relative;
+    bottom: 0;
+    height: 100%;
+    width: 100%;
+}
+
+.group-tab::before {
+    content: attr(group-name);
+    width: auto;
+    height: 15px;
+    background: var(--group-color);
+    border-radius: 5px;
+    padding: 3px 6px;
+    display: flex;
+    margin: 0 5px 0 10px;
+    align-items: center;
+}
+
+.group-tab:after {
+    content: "";
+    width: 100%;
+    position: absolute;
+    bottom: 0;
+    background: var(--group-color);
+    z-index: 9999;
+    height: 4px;
+    left: 0;
+}
+
+.grouped-tab:hover {
+    background: var(--tab-hover-color) !important;
+}
+
+.tabs-group .monaco-icon-label:after {
+    margin: 0 16px 0 5px !important;
+    align-content: center;
+}
+
+.grouped-tab:not(.active):hover .rounded-left-border, 
+.grouped-tab:not(.active):hover .rounded-right-border { 
+    color: var(--tab-hover-color) !important;
+}
+
+.tab.active.grouped-tab {
+    background-color: var(--vscode-tab-activeBackground) !important;
+}
 `;
 const scriptId = 'grouped-tabs-script';
 var scriptContent = `
     const updateTabsBackground = () => {
-        const tabs = document.querySelectorAll('.tab');
-        tabs.forEach(tab => {
-            let tabColor = getComputedStyle(tab).backgroundColor;
-            if (!tab.querySelector('.rounded-left-border')) {
-                createRoundedBorderDiv(tab, 'rounded-left-border', \`${tabBgLeftSvg}\`);
+        const notGroupedTabs = document.querySelectorAll('.tab:not(.grouped-tab)');
+        notGroupedTabs.forEach(notGroupedTab => {
+            if (!notGroupedTab.querySelector('.rounded-left-border')) {
+                createRoundedBorderDiv(notGroupedTab, 'rounded-left-border', \`${tabBgLeftSvg}\`);
             }
-            if (!tab.querySelector('.rounded-right-border')) {
-                createRoundedBorderDiv(tab, 'rounded-right-border', \`${tabBgRightSvg}\`);
+            if (!notGroupedTab.querySelector('.rounded-right-border')) {
+                createRoundedBorderDiv(notGroupedTab, 'rounded-right-border', \`${tabBgRightSvg}\`);
             }
         });
     };
@@ -489,35 +553,49 @@ function parseTabAriaLabel(path) {
 
 function paintTabsGrouping(hotReload = false) {
     var scriptToInject = scriptContent;
+    var styleToInject = styleContent;
+    var injectedGroupNamesForStyle = [];
     const openFiles = getOpenFiles(false);
     openFiles.forEach((file, index) => {
         let arialabel = parseTabAriaLabel(file.input.uri.fsPath);
         const groupName = findGroupForFile(file.input.uri.fsPath.split('/').pop());
         if (groupName) {
+            const groupColor = groups[groupName].color;
             console.log(`[paintTabsGrouping] Painting tab ${index}:`, arialabel, groupName);
             scriptToInject += `
                 function paintTabsGroupingFor${index}() {
-                    console.log('[paintTabsGrouping${index}] Trying to get tab with aria-label:', "${arialabel}");
                     var tab = getTabByAriaLabel("${arialabel}");
-                    console.log('[paintTabsGrouping${index}] Tab found:', tab);
                     if (${debug}) console.log('[paintTabsGrouping${index}] Trying to get tab with aria-label:', "${arialabel}", tab);
                     if (tab) {
                         tab.classList.add('grouped-tab');
+                        tab.setAttribute('group-name', '${groupName}');
+                        tab.style.setProperty('--group-color', '${groupColor}');
                         var groupDiv = document.getElementById('group-${groupName}');
                         if (!groupDiv) {
+                            const parentElement = tab.parentNode;
                             groupDiv = document.createElement('div');
                             groupDiv.id = 'group-${groupName}';
-                            groupDiv.className = 'tabs-group';
-                            tab.parentNode.insertBefore(groupDiv, tab);
+                            groupDiv.classList.add('group-tab');
+                            groupDiv.setAttribute('group-name', '${groupName}');
+                            groupDiv.style.setProperty('--group-color', '${groupColor}');
+                            parentElement.insertBefore(groupDiv, tab);
                         }
-                        groupDiv.appendChild(tab);
                     }
                 }
                 onTabsLoad(paintTabsGroupingFor${index});
             `;
+            if (!Object.hasOwn(injectedGroupNamesForStyle, groupName)) {
+                styleToInject += `
+                    .grouped-tab[group-name="${groupName}"]:not(:first-of-type)::before {
+                        content: ""; /* Prevents the same name from being repeated in consecutive tabs of the same group */
+                        display: none;
+                    }
+                `;
+                injectedGroupNamesForStyle[groupName] = true;
+            }
         }
     });
-    writeOnVsCode(scriptToInject, styleContent, hotReload);
+    writeOnVsCode(scriptToInject, styleToInject, hotReload);
 }
 
 /**
