@@ -30,143 +30,60 @@ var subscriptions = [];
 const styleId = 'grouped-tabs-style';
 var styleContent = `
 /* Tab actions (close button) */
-.tab-actions {
-    z-index: 5;
-}
+.tab-actions { z-index: 5; }
 /* Disable VSCode native tab drag-and-drop indicator */
 .monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab.drop-target-left:after,
-.monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab.drop-target-right:before {
-    background-color: transparent;
-}
-
+.monaco-workbench .part.editor>.content .editor-group-container>.title .tabs-container>.tab.drop-target-right:before { background-color: transparent; }
 /* Tab drag-and-drop */
 .tab.drop-target-right:not([aria-selected='true']) .rounded-left-border,
-.tab.drop-target-left:not([aria-selected='true']) .rounded-right-border {
-    stroke: var(--vscode-tab-dragAndDropBorder)
-}
-
+.tab.drop-target-left:not([aria-selected='true']) .rounded-right-border { stroke: var(--vscode-tab-dragAndDropBorder); }
 /* Tab rounded borders */
-.rounded-left-border, .rounded-right-border {
-    position: absolute;
-    width: 30px;
-    height: 35px;
-    overflow: hidden;
-    color: var(--vscode-tab-inactiveBackground);
-}
-
+.rounded-left-border, .rounded-right-border { width: 30px; height: 35px; overflow: hidden; color: var(--vscode-tab-inactiveBackground); }
 .rounded-right-border { right: -15px; }
-
 .rounded-left-border { left: -15px; }
-
 /* Set active color */
 .tab.active .rounded-left-border,
-.tab.active .rounded-right-border {
-    color: var(--vscode-tab-activeBackground);
-}
-
+.tab.active .rounded-right-border { color: var(--vscode-tab-activeBackground); }
 .rounded-right-border svg,
-.rounded-left-border svg {
-    width: inherit;
-    height: inherit;
-    stroke-width: 2;
-}
-
+.rounded-left-border svg { width: inherit; height: inherit; stroke-width: 2; }
 /* Tab space-between */
-.tab {
-    margin-left: 14px !important;
-    margin-right: 14px !important;
-    position: relative !important;
-}
-
+.tab { margin-left: 14px !important; margin-right: 14px !important; position: relative !important; }
 /* 
     Tab hover effect
     - Change the color of the rounded borders to the tab background color
     - Via JS we set the --tab-border-hover-color variable to the tab background color (Necessary to work with all VSCode Themes)
 */
 .monaco-workbench .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab:not(.selected):hover .rounded-left-border,
-.monaco-workbench .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab:not(.selected):hover .rounded-right-border {
-    color: var(--tab-border-hover-color) !important;
-}
-
+.monaco-workbench .part.editor > .content .editor-group-container.active > .title .tabs-container > .tab:not(.selected):hover .rounded-right-border { color: var(--tab-border-hover-color) !important; }
 /* Tabs group */
-.tabs-group {
-    display: flex;
-    align-items: center;
-}
-
-.tabs-group > * {
-    display: flex;
-}
-
-.tabs-group > * > .tab-label > * {
-    align-content: center;
-}
-
-.group-tab {
-    display: flex;
-    align-items: center;
-    position: relative;
-    bottom: 0;
-    height: 100%;
-    width: auto;
-}
-
-.group-tab::before {
-    content: attr(group-name);
-    width: auto;
-    height: 15px;
-    background: var(--group-color);
-    border-radius: 5px;
-    padding: 3px 6px;
-    display: flex;
-    margin: 0 10px 0 10px;
-    align-items: center;
-}
-
-.group-tab:after {
-    content: "";
-    width: 100%;
-    position: absolute;
-    bottom: 0;
-    background: var(--group-color);
-    z-index: 9999;
-    height: 4px;
-    left: 0;
-}
-
-.grouped-tab:hover {
-    background: var(--tab-hover-color) !important;
-}
-
-.tabs-group .monaco-icon-label:after {
-    margin: 0 16px 0 5px !important;
-    align-content: center;
-}
-
+.tabs-group, .group-tab, .group-tab .group-color { align-items: center; }
+.tabs-group, .tabs-group > *, .group-tab, .group-tab .group-color { display: flex; }
+.tabs-group > * > .tab-label > *, .tabs-group .monaco-icon-label:after { align-content: center; }
+.group-tab, .group-tab .group-color, .rounded-left-border, .rounded-right-border { position: absolute; }
+.group-tab { bottom: 0; height: 100%; width: 100%; left: 0; }
+.group-tab .group-color { width: 100%; top: 0px; background: var(--group-color); z-index: 1; height: 0; left: -5px; border-radius: 4px 4px 0 0; transition: .25s ease-in; color: transparent; font-size: 8.5px; font-weight: 600; padding-left: 10px; padding-top: 3px; padding-bottom: 3px; }
+.group-tab .group-color, .group-tab .group-color:hover { transition: 0.25s ease-in; }
+.group-tab .group-color:hover { height: 13.5%; color: color-mix(in srgb, var(--group-color) 40%, #fff); }
+.grouped-tab:hover { background: var(--tab-hover-color) !important; }
+.tabs-group .monaco-icon-label:after { margin: 0 16px 0 5px !important; }
 .grouped-tab:not(.active):hover .rounded-left-border, 
-.grouped-tab:not(.active):hover .rounded-right-border { 
-    color: var(--tab-hover-color) !important;
-}
-
-.tab.active.grouped-tab {
-    background-color: var(--vscode-tab-activeBackground) !important;
-}
+.grouped-tab:not(.active):hover .rounded-right-border {  color: var(--tab-hover-color) !important; }
+.tab.active.grouped-tab { background-color: var(--vscode-tab-activeBackground) !important; }
 `;
 const scriptId = 'grouped-tabs-script';
 var scriptContent = `
-    const updateTabsBackground = () => {
-        const notGroupedTabs = document.querySelectorAll('.tab:not(.grouped-tab)');
-        notGroupedTabs.forEach(notGroupedTab => {
-            if (!notGroupedTab.querySelector('.rounded-left-border')) {
-                createRoundedBorderDiv(notGroupedTab, 'rounded-left-border', \`${tabBgLeftSvg}\`);
+    var updateTabsBackground = () => {
+        document.querySelectorAll('.tab').forEach(tab => {
+            if (!tab.querySelector('.rounded-left-border')) {
+                createRoundedBorderDiv(tab, 'rounded-left-border', \`${tabBgLeftSvg}\`);
             }
-            if (!notGroupedTab.querySelector('.rounded-right-border')) {
-                createRoundedBorderDiv(notGroupedTab, 'rounded-right-border', \`${tabBgRightSvg}\`);
+            if (!tab.querySelector('.rounded-right-border')) {
+                createRoundedBorderDiv(tab, 'rounded-right-border', \`${tabBgRightSvg}\`);
             }
         });
     };
 
-    const createRoundedBorderDiv = (tab, className, svgContent) => {
+    var createRoundedBorderDiv = (tab, className, svgContent) => {
         let roundedBorderDiv = document.createElement('div');
         roundedBorderDiv.className = className;
         roundedBorderDiv.innerHTML = svgContent;
@@ -177,7 +94,7 @@ var scriptContent = `
         });
     };
 
-    const getTabByAriaLabel = (ariaLabel) => {
+    var getTabByAriaLabel = (ariaLabel) => {
         let tab = document.querySelector('.tabs-container [aria-label~="' + ariaLabel + '"]')?.parentElement;
         if (!tab) {
             // Try to get tab with filename only
@@ -187,20 +104,20 @@ var scriptContent = `
         return tab;
     };
 
-    const onTabsLoad = (callback) => {
+    var onTabsLoad = (callback, flush = true) => {
         if (typeof callback !== 'function') return;
         const tabsObserver = new MutationObserver((mutationsList, observer) => {
             mutationsList.forEach(mutation => {
                 if (mutation.addedNodes.length > 0) {
                     setTimeout(callback, 5000);
-                    observer.disconnect();
+                    if (flush) observer.disconnect();
                 }
             });
         });
         tabsObserver.observe(document.body, { childList: true, subtree: true });
     };
 
-    const onTabsContainerChanges = (callback) => {
+    var onTabsContainerChanges = (callback, flush) => {
         const newTabObserver = new MutationObserver(() => {
             callback();
         });
@@ -215,9 +132,9 @@ var scriptContent = `
     updateTabsBackground();
 
     // Observe for new tabs being added
-    onTabsContainerChanges(updateTabsBackground);
+    onTabsContainerChanges(updateTabsBackground, true);
+
 `;
-var script = null;
 var htmlPath = null;
 const backupFileName = 'workbench.html.backup';
 
@@ -304,6 +221,10 @@ function activate(context) {
     });
     subscriptions.push(restoreBackupCommand);
 
+    // Command to show groups and files
+    let showGroupsCommand = vscode.commands.registerCommand('extension.showGroups', showGroups);
+    subscriptions.push(showGroupsCommand);
+
     // Visible editors changes listener
     vscode.window.onDidChangeVisibleTextEditors(() => {
         updateContext(context);
@@ -313,7 +234,9 @@ function activate(context) {
         updateContext(context);
     });
     // Editor closes listener
-    vscode.workspace.onDidCloseTextDocument(() => {
+    vscode.workspace.onDidCloseTextDocument((document) => {
+        const tabUri = document.uri.fsPath;
+        removeTabFromGroup(tabUri, context);
         updateContext(context);
     });
     // Window state changes listener
@@ -524,7 +447,7 @@ function addToGroup(groupName, fileName, path, context) {
         if (!fileAlreadyExists) {
             // Remove file from previous group
             const existingGroup = findGroupForFile(fileName);
-            if (existingGroup) removeFromGroup(existingGroup, fileName);
+            if (existingGroup) removeFromGroup(existingGroup, fileName, context);
             groups[groupName].files.push({
                 name: fileName,
                 path: path,
@@ -553,48 +476,54 @@ function parseTabAriaLabel(path) {
 
 function paintTabsGrouping(hotReload = false) {
     var scriptToInject = scriptContent;
+    scriptToInject += 'var paintTabsGroupingCalls = [];';
     var styleToInject = styleContent;
-    var injectedGroupNamesForStyle = [];
     const openFiles = getOpenFiles(false);
     openFiles.forEach((file, index) => {
         let arialabel = parseTabAriaLabel(file.input.uri.fsPath);
         const groupName = findGroupForFile(file.input.uri.fsPath.split('/').pop());
         if (groupName) {
             const groupColor = groups[groupName].color;
-            console.log(`[paintTabsGrouping] Painting tab ${index}:`, arialabel, groupName);
+            if (debug) console.log(`[paintTabsGrouping] Painting tab ${index}:`, arialabel, groupName);
             scriptToInject += `
                 function paintTabsGroupingFor${index}() {
                     var tab = getTabByAriaLabel("${arialabel}");
                     if (${debug}) console.log('[paintTabsGrouping${index}] Trying to get tab with aria-label:', "${arialabel}", tab);
                     if (tab) {
-                        tab.classList.add('grouped-tab');
+                        if (!tab.classList.contains('grouped-tab')) tab.classList.add('grouped-tab');
                         tab.setAttribute('group-name', '${groupName}');
                         tab.style.setProperty('--group-color', '${groupColor}');
                         var groupDiv = document.getElementById('group-${groupName}');
-                        if (!groupDiv) {
-                            const parentElement = tab.parentNode;
-                            groupDiv = document.createElement('div');
-                            groupDiv.id = 'group-${groupName}';
-                            groupDiv.classList.add('group-tab');
-                            groupDiv.setAttribute('group-name', '${groupName}');
-                            groupDiv.style.setProperty('--group-color', '${groupColor}');
-                            parentElement.insertBefore(groupDiv, tab);
-                        }
+                        groupDiv = document.createElement('div');
+                        groupDiv.id = 'group-${groupName}';
+                        if (!groupDiv.classList.contains('group-tab')) groupDiv.classList.add('group-tab');
+                        groupDiv.setAttribute('group-name', '${groupName}');
+                        groupDiv.style.setProperty('--group-color', '${groupColor}');
+                        groupColorDiv = document.createElement('div');
+                        groupColorDiv.className = 'group-color';
+                        groupColorDiv.style.setProperty('--group-color', '${groupColor}');
+                        groupColorDiv.setAttribute('group-name', '${groupName}');
+                        if (groupDiv.contains(groupColorDiv)) groupDiv.removeChild(groupColorDiv);
+                        groupDiv.appendChild(groupColorDiv);
+                        groupColorDiv.setAttribute('title', '${groupName}');
+                        groupColorDiv.innerText = '${groupName}';
+                        if (tab.contains(groupDiv)) tab.removeChild(groupDiv);
+                        tab.appendChild(groupDiv);
                     }
                 }
-                onTabsLoad(paintTabsGroupingFor${index});
+                paintTabsGroupingCalls.push(paintTabsGroupingFor${index});
             `;
-            if (!Object.hasOwn(injectedGroupNamesForStyle, groupName)) {
-                styleToInject += `
-                    .grouped-tab[group-name="${groupName}"]:not(:first-of-type)::before {
-                        content: ""; /* Prevents the same name from being repeated in consecutive tabs of the same group */
-                        display: none;
-                    }
-                `;
-                injectedGroupNamesForStyle[groupName] = true;
-            }
         }
     });
+    scriptToInject += `
+        var paintTabsGroupingCallback = () => {
+            paintTabsGroupingCalls.forEach(paintTabsGroupingCall => {
+                paintTabsGroupingCall();
+            });
+        }
+        onTabsContainerChanges(paintTabsGroupingCallback);
+        onTabsLoad(paintTabsGroupingCallback);
+    `;
     writeOnVsCode(scriptToInject, styleToInject, hotReload);
 }
 
@@ -603,7 +532,7 @@ function paintTabsGrouping(hotReload = false) {
  * @param {string} groupName Group name.
  * @param {string} fileName File name.
  */
-function removeFromGroup(groupName, fileName) {
+function removeFromGroup(groupName, fileName, context) {
     if (debug) console.log('Removing file from group:', groupName, fileName);
     if (groups[groupName]) {
         const fileIndex = groups[groupName].files.findIndex(file => file.name === fileName);
@@ -625,12 +554,46 @@ function removeFromGroup(groupName, fileName) {
 }
 
 /**
+ * Removes a tab from its group when closed.
+ * @param {string} tabUri Tab URI.
+ * @param {vscode.ExtensionContext} context
+ */
+function removeTabFromGroup(tabUri, context) {
+    for (const [groupName, group] of Object.entries(groups)) {
+        const fileIndex = group.files.findIndex(file => file.path === tabUri);
+        if (fileIndex !== -1) {
+            group.files.splice(fileIndex, 1);
+            if (group.files.length === 0) {
+                delete groups[groupName];
+            }
+            context.globalState.update('groups', groups);
+            vscode.window.showInformationMessage(`Removed tab from group: ${groupName}`);
+            break;
+        }
+    }
+}
+
+/**
  * Generate random color with hexadecimal format.
  * @returns {string} Random color with format `#RRGGBB`.
  */
 function getRandomColor() {
-    const randomColor = Math.floor(Math.random() * 0xffffff).toString(16);
-    return `#${randomColor.padStart(6, '0')}`;
+    function getRandomHex() {
+        return Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+    }
+    function getLuminance(r, g, b) {
+        // Calculates the perceived luminance of the color (according to human perception standards)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    let color, r, g, b, luminance;
+    do {
+        r = parseInt(getRandomHex(), 16);
+        g = parseInt(getRandomHex(), 16);
+        b = parseInt(getRandomHex(), 16);
+        luminance = getLuminance(r, g, b);
+        color = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    } while (luminance > 200); // Filters light colors that do not generate contrast
+    return color;
 }
 
 /**
@@ -658,6 +621,21 @@ function getOpenFiles(exclude_grouped = true) {
 function isFileOpened(path) {
     if (debug) console.log('Checking if file is opened:', path);
     return getOpenFiles(false).some(openFile => openFile.input.uri.fsPath === path);
+}
+
+/**
+ * Show groups and files.
+ */
+function showGroups() {
+    let message = '[Groups and Files] ';
+    for (const [groupName, group] of Object.entries(groups)) {
+        message += `{ \nGroup ${groupName} (Color: ${group.color}): `;
+        group.files.forEach(file => {
+            message += ` - ${file.name} (${file.path})`;
+        });
+        message += ' } ';
+    }
+    vscode.window.showInformationMessage(message);
 }
 
 /**
@@ -691,9 +669,8 @@ function writeOnVsCode(scriptContentToInject, styleContentToInject, hotReload = 
         const $ = cheerio.load(data);
         $('meta[http-equiv="Content-Security-Policy"]').remove();
         script = $('#'+scriptId);
-        // Clean old script
-        let scriptExists = script.length;
-        if (scriptExists) script.remove();
+        // Clean old script when is loaded
+        if ($('#'+scriptId)) $('#'+scriptId).onload = () => $('#'+scriptId).remove();
         // Load script
         let scriptToInject = `
             // Clear old style
@@ -701,10 +678,17 @@ function writeOnVsCode(scriptContentToInject, styleContentToInject, hotReload = 
                 document.getElementById('${styleId}').remove();
             }
             // Load style
-            const styleElement = document.createElement('style');
+            styleElement = document.createElement('style');
             styleElement.id = '${styleId}';
             styleElement.textContent = \`${styleContentToInject}\`;
             document.head.append(styleElement);
+            // Prevent from script escape text
+            document.body.childNodes.forEach(children => {
+                if (children.nodeType === Node.TEXT_NODE) {
+                    document.body.removeChild(children);
+                }
+            });
+
         ` + scriptContentToInject;
         $('html').append('<script id="' + scriptId + '">'+scriptToInject+'</script>');
         // Set new layout
