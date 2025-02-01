@@ -222,7 +222,7 @@ function activate(context) {
     subscriptions.push(restoreBackupCommand);
 
     // Command to show groups and files
-    let showGroupsCommand = vscode.commands.registerCommand('extension.showGroups', showGroups);
+    const showGroupsCommand = vscode.commands.registerCommand('extension.showGroups', showGroups);
     subscriptions.push(showGroupsCommand);
 
     // Visible editors changes listener
